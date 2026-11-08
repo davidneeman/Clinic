@@ -482,3 +482,22 @@ test('the home page’s gallery and photos match what the editor knows', () => {
   assert.match(html, /<img data-photo="hero" src="images\/room\.jpg" srcset="images\/room-640\.jpg 640w, images\/room\.jpg 960w, images\/room-1440\.jpg 1440w"/);
   assert.match(html, /<img data-photo="about" src="images\/about\.jpg" srcset="images\/about\.jpg 900w, images\/about-1350\.jpg 1350w, images\/about-1800\.jpg 1800w"/);
 });
+
+test('before the database is updated (no notices table yet), the rest keeps working', async () => {
+  const db = fakeD1();
+  db.raw.exec('DROP TABLE notices; ALTER TABLE blocked_dates DROP COLUMN notice_id;');
+  const ctx = setup({ db });
+  const me = await ctx.signIn();
+  // His texts reach the pages.
+  assert.equal((await ctx.save(me, { texts: { 'about.quote': 'ציטוט' } })).status, 200);
+  const page = await ctx.call('/');
+  assert.equal(page.status, 200);
+  assert.deepEqual(pageData(page.body), { content: { texts: { 'about.quote': 'ציטוט' } }, notices: [] });
+  assert.deepEqual((await ctx.call('/api/site')).body.notices, []);
+  // Closing a day by hand, and the list of closed days, as before.
+  assert.equal((await ctx.call('/api/admin/blocked', { method: 'POST', body: { date: '2026-10-05', note: 'חג' }, cookie: me })).status, 201);
+  assert.deepEqual((await ctx.call('/api/admin/schedule', { cookie: me })).body.blocked, [{ date: '2026-10-05', note: 'חג', notice_id: null }]);
+  assert.deepEqual((await ctx.call('/api/config')).body.closedDays, ['2026-10-05'], '"open now" knows about it');
+  // Only the notices wait for the update.
+  assert.equal((await ctx.call('/api/admin/notices', { cookie: me })).status, 500);
+});

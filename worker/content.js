@@ -99,10 +99,19 @@ export function openContentStore(db, clock = () => new Date()) {
         .bind(JSON.stringify(content))
         .run(),
 
-    /** What every page needs: his content and the notices showing now (one trip to D1). */
+    /**
+     * What every page needs: his content and the notices showing now (one trip to D1). If the
+     * notices can't be read (the database not updated yet: migrations/0005), his content
+     * still goes on the pages.
+     */
     async publicSite() {
-      const [content, notices] = await db.batch([contentQuery(), noticesQuery()]);
-      return { content: parse(content.results[0]?.value), notices: asPublic(notices.results) };
+      try {
+        const [content, notices] = await db.batch([contentQuery(), noticesQuery()]);
+        return { content: parse(content.results[0]?.value), notices: asPublic(notices.results) };
+      } catch (err) {
+        if (!/no such table: notices/.test(String(err?.message))) throw err;
+        return { content: parse(await contentQuery().first('value')), notices: [] };
+      }
     },
     publicNotices: async () => asPublic((await noticesQuery().all()).results),
 

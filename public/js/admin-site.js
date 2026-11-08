@@ -89,12 +89,17 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
   }
 
   async function load() {
-    const [content, notices] = await Promise.all([guarded(() => api('/api/admin/content')), guarded(() => api('/api/admin/notices'))]);
+    // The notices load on their own: if they can't, the rest of the editor still works.
+    const [content, notices] = await Promise.all([
+      guarded(() => api('/api/admin/content')),
+      guarded(() => api('/api/admin/notices')).catch(() => null),
+    ]);
     s.saved = content.content || {};
     s.work = structuredClone(s.saved);
     s.defaults = content.defaults;
     s.media = Boolean(content.media);
-    s.notices = notices.notices;
+    s.notices = notices?.notices || [];
+    s.noticesFailed = !notices;
     s.loaded = true;
     render();
   }
@@ -137,7 +142,11 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
 
   function renderNotices() {
     const list = $('notices-list');
-    $('notice-add').hidden = Boolean(s.editing);
+    $('notice-add').hidden = Boolean(s.editing) || s.noticesFailed;
+    if (s.noticesFailed) {
+      list.replaceChildren(el('p', { class: 'alert alert-error' }, t('admin.noticesUnavailable')));
+      return;
+    }
     if (!s.notices.length) {
       list.replaceChildren(el('p', { class: 'empty-state' }, t('admin.noticeNone')));
     } else {
@@ -212,6 +221,7 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
   async function reloadNotices() {
     try {
       s.notices = (await guarded(() => api('/api/admin/notices'))).notices;
+      s.noticesFailed = false;
     } catch {
       /* the list stays as it was */
     }

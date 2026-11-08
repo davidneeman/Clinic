@@ -212,15 +212,29 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
           .all()
       ).results,
 
-    // (notice_id: the day was closed by a notice on the site, and opens again with it)
+    // (notice_id: the day was closed by a notice on the site, and opens again with it. Both of
+    // these also work on a database without that column yet: migrations/0005.)
     listBlocked: async (today) =>
-      (await db.prepare('SELECT date, note, notice_id FROM blocked_dates WHERE date >= ? ORDER BY date').bind(today).all()).results,
+      (await db.prepare('SELECT * FROM blocked_dates WHERE date >= ? ORDER BY date').bind(today).all()).results.map((b) => ({
+        date: b.date,
+        note: b.note,
+        notice_id: b.notice_id ?? null,
+      })),
     // A day he closes by hand is his, even if a notice had closed it too.
-    addBlocked: (date, note) =>
-      db
-        .prepare('INSERT INTO blocked_dates (date, note) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET note = excluded.note, notice_id = NULL')
-        .bind(date, note || null)
-        .run(),
+    async addBlocked(date, note) {
+      try {
+        return await db
+          .prepare('INSERT INTO blocked_dates (date, note) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET note = excluded.note, notice_id = NULL')
+          .bind(date, note || null)
+          .run();
+      } catch (err) {
+        if (!/no such column: notice_id/.test(String(err?.message))) throw err;
+        return db
+          .prepare('INSERT INTO blocked_dates (date, note) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET note = excluded.note')
+          .bind(date, note || null)
+          .run();
+      }
+    },
     removeBlocked: async (date) => changed(await db.prepare('DELETE FROM blocked_dates WHERE date = ?').bind(date).run()),
     addMessage: (m) =>
       db
