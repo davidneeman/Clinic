@@ -151,7 +151,7 @@ test('Face ID: a one-time link adds a passkey, then the passkey signs in', async
   const setCookie = added.headers.get('set-cookie');
   assert.match(setCookie, /^__Host-admin=[\w-]{40,}; Path=\/; Secure; HttpOnly; SameSite=Strict; Max-Age=43200$/);
   const cookie = cookieOf(added);
-  assert.deepEqual((await call('/api/admin/session', { cookie })).body, { enabled: true, loggedIn: true, passkeys: true, name: 'רותם', access: false });
+  assert.deepEqual((await call('/api/admin/session', { cookie })).body, { enabled: true, loggedIn: true, passkeys: true, name: 'רותם', access: false, editor: true, media: false });
 
   // The link worked once.
   assert.equal((await call('/api/admin/passkey/register/start', { method: 'POST', body: { invite: code } })).status, 403);

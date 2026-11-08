@@ -1,6 +1,7 @@
 // Cloudflare settings for the website. The pages and files come from dist/ (built from
 // public/ by scripts/build-cloudflare.mjs) and Cloudflare serves them by itself; the Worker
-// in worker/ answers only /api/*. Setup and deployment: worker/README.md.
+// in worker/ answers /api/*, serves the photos uploaded in the admin panel (/media/*), and
+// puts David's content into the home and booking pages. Setup and deployment: worker/README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "clinic",
@@ -18,9 +19,11 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    // Only these reach the Worker. Pages, photos and the video are served straight from
-    // Cloudflare's cache, which is free and doesn't count toward the daily request limit.
-    "run_worker_first": ["/api/*", "/healthz"]
+    // Only these reach the Worker: the API, the photos uploaded in the admin panel, and the
+    // two pages his texts, photos and notices go into. The other files, the site's own
+    // photos and the video are served straight from Cloudflare's cache, which is free and
+    // doesn't count toward the daily request limit.
+    "run_worker_first": ["/api/*", "/healthz", "/media/*", "/", "/book"]
   },
 
   // The bookings, closed days, opening hours and messages (made with
@@ -33,6 +36,9 @@
       "migrations_dir": "migrations"
     }
   ],
+
+  // The photos David uploads in the admin panel (worker/content.js), in Workers KV.
+  "kv_namespaces": [{ "binding": "MEDIA", "id": "a199f2c60d3445b888c934c5bb9d2fbf" }],
 
   // Per visitor (by IP address): any API call, and sending a booking or a message.
   "ratelimits": [
@@ -53,7 +59,8 @@
   },
 
   // Every 10 minutes: ask Grow about payments it hasn't reported, release held times that
-  // ran out, and retry bookings that didn't reach the calendar.
+  // ran out, and retry bookings that didn't reach the calendar (and once a day, delete
+  // uploaded photos that nothing on the site uses any more).
   "triggers": { "crons": ["*/10 * * * *"] },
 
   "observability": { "enabled": true },

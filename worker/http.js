@@ -27,15 +27,9 @@ export class HttpError extends Error {
   }
 }
 
-/**
- * The JSON body of a request, read up to `max` bytes. Anything that isn't JSON is refused:
- * a page on another site can't send JSON here without the browser asking first (CORS), which
- * this site never allows.
- */
-export async function readJson(request, max = 20_000) {
-  if (!/^application\/json\b/i.test(request.headers.get('Content-Type') || '')) throw new HttpError(415, 'json_required');
+/** A request's body as bytes, read up to `max` bytes (413 beyond that). */
+export async function readBytes(request, max) {
   if (Number(request.headers.get('Content-Length') || 0) > max) throw new HttpError(413, 'too_large');
-
   const chunks = [];
   let size = 0;
   if (request.body) {
@@ -57,7 +51,17 @@ export async function readJson(request, max = 20_000) {
     all.set(c, at);
     at += c.byteLength;
   }
-  const text = new TextDecoder().decode(all).trim();
+  return all;
+}
+
+/**
+ * The JSON body of a request, read up to `max` bytes. Anything that isn't JSON is refused:
+ * a page on another site can't send JSON here without the browser asking first (CORS), which
+ * this site never allows.
+ */
+export async function readJson(request, max = 20_000) {
+  if (!/^application\/json\b/i.test(request.headers.get('Content-Type') || '')) throw new HttpError(415, 'json_required');
+  const text = new TextDecoder().decode(await readBytes(request, max)).trim();
   if (!text) return {};
   try {
     return JSON.parse(text);

@@ -1,5 +1,6 @@
 import { dictionaries } from './i18n.js';
 import { hydrateIcons, svg } from './icons.js';
+import { applyContentTexts } from './site-content.js';
 
 const root = document.documentElement;
 const listeners = new Set();
@@ -19,6 +20,48 @@ function storageSet(key, value) {
     /* private mode – ignore */
   }
 }
+
+// ---------------------------------------------------------------------------
+// David's content and notices (the admin panel's "האתר" tab). The Worker puts them in the page
+// as a data block (#site-data); his texts replace the dictionary's own before anything is
+// written on the page.
+// ---------------------------------------------------------------------------
+
+/** The Hebrew texts as they come with the site (for "back to the original"). */
+export const pristineHebrew = structuredClone(dictionaries.he);
+const siteDataListeners = new Set();
+let siteData = readSiteData();
+
+function readSiteData() {
+  const node = document.getElementById('site-data');
+  if (!node) return null;
+  try {
+    return JSON.parse(node.textContent);
+  } catch {
+    return null;
+  }
+}
+
+export const getSiteData = () => siteData;
+/** Where his uploaded photos are: this site ('' – the GitHub Pages copy asks the site's address). */
+export const mediaBase = () => '';
+export function onSiteData(fn) {
+  siteDataListeners.add(fn);
+}
+
+/** Newer content (the GitHub Pages copy fetches it after the page opens): show it everywhere. */
+export function setSiteData(data) {
+  siteData = data;
+  useSiteTexts();
+  applyTranslations();
+  renderNotices();
+  siteDataListeners.forEach((fn) => fn(data));
+}
+
+function useSiteTexts() {
+  applyContentTexts(dictionaries.he, pristineHebrew, siteData?.content?.texts);
+}
+useSiteTexts();
 
 // ---------------------------------------------------------------------------
 // Language
@@ -69,7 +112,12 @@ export function setLang(lang) {
  *   data-i18n-attr="placeholder:key;aria-label:key" → attributes
  */
 export function applyTranslations(scope = document) {
-  for (const el of scope.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  for (const el of scope.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(el.dataset.i18n);
+    // A paragraph he can leave empty (data-optional) disappears when it is.
+    const box = el.closest('[data-optional]');
+    if (box) box.hidden = !el.textContent.trim();
+  }
   for (const el of scope.querySelectorAll('[data-i18n-attr]')) {
     for (const pair of el.dataset.i18nAttr.split(';')) {
       const [attr, key] = pair.split(':').map((s) => s.trim());
@@ -224,13 +272,25 @@ export function dayName(day, style = 'long') {
   return new Intl.DateTimeFormat(locale(), { weekday: style, timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + day)));
 }
 
+/** "YYYY-MM-DD" in the clinic's time zone, `offset` days from `at`. */
+function clinicDate(timeZone, at, offset = 0) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  return new Date(Date.parse(`${today}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+}
+
 export function clinicStatus(cfg = siteConfig, at = new Date()) {
   if (!cfg?.hours) return null;
   const now = clinicNow(cfg.timezone, at);
-  for (const [from, to] of cfg.hours[now.day] || []) {
-    if (now.minutes >= hhmmToMinutes(from) && now.minutes < hhmmToMinutes(to)) return { open: true, until: to, today: now.day };
+  // Days closed in the admin panel (by hand, or by a notice on the site) aren't open.
+  const closed = new Set(cfg.closedDays || []);
+  const isClosed = (offset) => closed.size > 0 && closed.has(clinicDate(cfg.timezone, at, offset));
+  if (!isClosed(0)) {
+    for (const [from, to] of cfg.hours[now.day] || []) {
+      if (now.minutes >= hhmmToMinutes(from) && now.minutes < hhmmToMinutes(to)) return { open: true, until: to, today: now.day };
+    }
   }
   for (let offset = 0; offset < 8; offset++) {
+    if (isClosed(offset)) continue;
     const day = (now.day + offset) % 7;
     for (const [from] of cfg.hours[day] || []) {
       if (offset > 0 || hhmmToMinutes(from) > now.minutes) return { open: false, day, offset, at: from, today: now.day };
@@ -256,6 +316,63 @@ function renderStatus() {
     node.classList.toggle('is-open', s.open);
     node.hidden = !text;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Notices at the top of the site ("the clinic is closed until …"), from the admin panel.
+// A visitor can close a notice or a piece of news (it stays closed for them until it's
+// changed); an alert stays.
+// ---------------------------------------------------------------------------
+
+const NOTICE_ICONS = { info: 'info', news: 'sparkle', alert: 'alert' };
+const noticeKey = (n) => `${n.id}:${n.v}`;
+const closedNotices = () => {
+  try {
+    const list = JSON.parse(storageGet('notices-closed') || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+};
+
+export function renderNotices() {
+  document.querySelector('.site-notices')?.remove();
+  const header = document.querySelector('.site-header');
+  if (!header || header.classList.contains('admin-header')) return;
+  const closed = closedNotices();
+  const list = (siteData?.notices || []).filter((n) => n && n.text && (n.kind === 'alert' || !closed.includes(noticeKey(n))));
+  if (!list.length) return;
+  const box = el(
+    'div',
+    { class: 'site-notices', role: 'region', 'aria-label': t('notice.region') },
+    list.map((n) => {
+      const kind = NOTICE_ICONS[n.kind] ? n.kind : 'info';
+      const item = el(
+        'div',
+        { class: `notice notice-${kind}` },
+        el('span', { class: 'notice-icon', 'aria-hidden': 'true', html: svg(NOTICE_ICONS[kind]) }),
+        el('p', { class: 'notice-text' }, kind === 'news' ? el('strong', { class: 'notice-tag' }, t('notice.new')) : '', n.text),
+        kind === 'alert'
+          ? ''
+          : el('button', {
+              type: 'button',
+              class: 'notice-close',
+              'aria-label': t('notice.close'),
+              title: t('notice.close'),
+              html: svg('close'),
+              onclick: () => {
+                storageSet('notices-closed', JSON.stringify([...closed.filter((k) => k.split(':')[0] !== String(n.id)), noticeKey(n)].slice(-20)));
+                const next = item.nextElementSibling || item.previousElementSibling;
+                item.remove();
+                if (!box.querySelector('.notice')) box.remove();
+                (next?.querySelector('.notice-close') || document.getElementById('main'))?.focus?.({ preventScroll: true });
+              },
+            }),
+      );
+      return item;
+    }),
+  );
+  header.before(box);
 }
 
 // ---------------------------------------------------------------------------
@@ -724,6 +841,7 @@ function initReveal() {
 }
 
 hydrateIcons();
+renderNotices();
 initHeader();
 initA11yMenu();
 applyTranslations();

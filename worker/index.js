@@ -18,6 +18,11 @@
 // With ICLOUD_USER and ICLOUD_APP_PASSWORD set, times taken in the practitioner's iCloud
 // calendar don't show, and each confirmed booking is added to it (worker/calendar.js).
 //
+// The home and booking pages also come through here (wrangler.jsonc → run_worker_first), to
+// put in what David changes in the admin panel's "האתר" tab: his texts, photos and prices,
+// and the notices at the top of the site (worker/content.js). The photos he uploads are
+// served from /media/.
+//
 // Setup and deployment: worker/README.md.
 
 import siteConfig from '../config/site.json' with { type: 'json' };
@@ -35,9 +40,23 @@ import {
   paidTransaction,
   readNotice,
 } from './grow.js';
-import { HttpError, json, readCookie, readJson } from './http.js';
+import { HttpError, json, readBytes, readCookie, readJson } from './http.js';
 import { PasskeyError, hashCode, randomCode, verifyLogin, verifyRegistration } from './passkeys.js';
 import { SlotTakenError, openD1Store } from './store.js';
+import { mergeSiteConfig, UPLOAD_ID_RE } from '../public/js/site-content.js';
+import {
+  MEDIA_MAX_BYTES,
+  applyContentPatch,
+  cleanJpeg,
+  injectSiteData,
+  newUploads,
+  noticeFields,
+  openContentStore,
+  removeUnusedUploads,
+  uploadSize,
+  uploadsExist,
+} from './content.js';
+import { PAGE_HEADERS } from './page-headers.js';
 
 const PHONE_RE = /^\+?[\d\s\-()]{7,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -57,6 +76,10 @@ const MODES = new Set(['whatsapp', 'pay', 'online', 'transfer']);
 const PLANS = new Set(['single', 'pack', 'card']);
 /** "+972 58-434-4047" → "058-434-4047", the way people type it into Bit or PayBox. */
 const localPhone = (phone) => String(phone || '').replace(/^\+972[\s-]*/, '0');
+// The pages that come with David's content in them (the others are served as they are).
+const PAGES = new Set(['/', '/book']);
+// How long a page waits for the database before it's served without his changes.
+const PAGE_DATA_MS = 2500;
 
 function str(v, max) {
   if (typeof v !== 'string') return '';
@@ -83,6 +106,75 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
   const now = () => nowInZone(tz, clock());
   const modeOf = (env) => (MODES.has(env.BOOKING_MODE) ? env.BOOKING_MODE : 'whatsapp');
   const storeFor = (env) => openD1Store(env.DB, config.defaultSchedule, clock);
+  const contentFor = (env) => openContentStore(env.DB, clock);
+  // The GitHub Pages copy of the site may read the site's content and notices from here.
+  const pagesOrigin = (() => {
+    try {
+      return config.siteUrl ? new URL(config.siteUrl).origin : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  /** The site's settings with David's treatments and prices from the admin panel. */
+  async function siteFor(env) {
+    try {
+      return mergeSiteConfig(config, await contentFor(env).content());
+    } catch (err) {
+      log.error('Reading the site content failed:', err?.message || String(err));
+      return mergeSiteConfig(config, {});
+    }
+  }
+
+  /**
+   * The home or booking page with David's content and the notices showing now. If the
+   * database doesn't answer in time, the page goes out as it comes with the site.
+   */
+  async function page(request, env, url) {
+    const ask = new Headers(request.headers);
+    ask.delete('If-None-Match');
+    ask.delete('If-Modified-Since');
+    const asset = await env.ASSETS.fetch(new Request(url.toString(), { method: 'GET', headers: ask }));
+    if (!asset.ok || !/^text\/html/i.test(asset.headers.get('Content-Type') || '')) return asset;
+    let data = null;
+    let timer;
+    try {
+      data = await Promise.race([
+        contentFor(env).publicSite(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timed out')), PAGE_DATA_MS);
+        }),
+      ]);
+    } catch (err) {
+      log.error('Page content failed (the page went out without it):', err?.message || String(err));
+    } finally {
+      clearTimeout(timer);
+    }
+    const html = await asset.text();
+    const headers = new Headers(asset.headers);
+    for (const h of ['ETag', 'Last-Modified', 'Content-Length', 'Content-Encoding']) headers.delete(h);
+    headers.set('Cache-Control', 'no-cache'); // his changes show at once
+    for (const [name, value] of Object.entries(PAGE_HEADERS)) headers.set(name, value);
+    const body = data ? injectSiteData(html, data) : html;
+    return new Response(request.method === 'HEAD' ? null : body, { status: asset.status, headers });
+  }
+
+  /** A photo he uploaded (/media/<id>-<width>.jpg): never changes, so browsers keep it. */
+  async function media(request, env, key) {
+    const found = env.MEDIA ? await env.MEDIA.getWithMetadata(key, { type: 'stream', cacheTtl: 86_400 }) : null;
+    if (!found?.value) throw notFound();
+    if (request.method === 'HEAD') await found.value.cancel();
+    return new Response(request.method === 'HEAD' ? null : found.value, {
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+        ...(found.metadata?.size ? { 'Content-Length': String(found.metadata.size) } : {}),
+      },
+    });
+  }
 
   // Emails aren't connected on Cloudflare yet: they come once the practice's domain is set.
   // Until then nothing is sent, and the log only notes that an email would have gone out,
@@ -141,7 +233,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     const settings = calendarSettings(env);
     if (!settings) return;
     try {
-      await addToCalendar(settings, { booking, serviceName: services.get(booking.service_id)?.name.he || booking.service_id, tz }, fetchImpl);
+      const service = (await siteFor(env)).services.find((s) => s.id === booking.service_id);
+      await addToCalendar(settings, { booking, serviceName: service?.name.he || booking.service_id, tz }, fetchImpl);
       await store.markInCalendar(booking.id);
     } catch (err) {
       log.error('Adding the booking to the calendar failed (tried again later):', err?.message || String(err));
@@ -216,23 +309,55 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       return json({ ok: true });
     }
 
+    // ---------- A photo David uploads in the admin panel (one size of it) ----------
+    // Its own body (a JPEG, not JSON), so it comes before the checks below – with the same
+    // rules: from this site's own pages only (a page on another site can't send image/jpeg
+    // here without the browser asking first), and only signed in.
+    const upload = /^\/api\/admin\/media\/(hero|about|service|gallery)\/([a-z2-7]{16})\/(\d{3,4})$/.exec(path);
+    if (upload && method === 'PUT') {
+      const origin = request.headers.get('Origin');
+      if (origin && origin !== url.origin) throw new HttpError(403, 'bad_origin');
+      await requireAdmin(request, env);
+      if (!env.MEDIA) throw new HttpError(503, 'media_unavailable');
+      const size = uploadSize(upload[1], Number(upload[3]));
+      if (!size || !UPLOAD_ID_RE.test(upload[2])) throw invalid(['width']);
+      if (!/^image\/jpeg$/i.test(request.headers.get('Content-Type') || '')) throw new HttpError(415, 'jpeg_required');
+      const photo = cleanJpeg(await readBytes(request, MEDIA_MAX_BYTES));
+      if (!photo) throw invalid(['photo']);
+      if (Math.abs(photo.width - size[0]) > 1 || Math.abs(photo.height - size[1]) > 1) throw invalid(['size']);
+      const key = `${upload[2]}-${upload[3]}`;
+      await env.MEDIA.put(key, photo.bytes, {
+        metadata: { w: photo.width, h: photo.height, size: photo.bytes.byteLength, created: clock().toISOString() },
+      });
+      return json({ ok: true, url: `/media/${key}.jpg` }, 201);
+    }
+
     // Anything that changes data must come from this site's own pages, as JSON.
     let body = null;
     if (method !== 'GET' && method !== 'HEAD') {
       const origin = request.headers.get('Origin');
       if (origin && origin !== url.origin) throw new HttpError(403, 'bad_origin');
-      body = await readJson(request);
+      // (the site's texts are saved in one go, so they may be longer)
+      body = await readJson(request, path === '/api/admin/content' ? 100_000 : undefined);
       if (body === null || typeof body !== 'object' || Array.isArray(body)) body = {};
     }
 
     // ---------- Public API ----------
 
     if (route === 'GET /api/config') {
-      const schedule = await store.getSchedule();
+      const today = now().date;
+      const [schedule, site, closedDays] = await Promise.all([
+        store.getSchedule(),
+        siteFor(env),
+        // Closed days this coming week, so "open now" on the site knows about them.
+        contentFor(env)
+          .closedDays(today, addDays(today, 7))
+          .catch(() => []),
+      ]);
       return json({
         business: config.business,
-        services: config.services,
-        prices: config.prices,
+        services: site.services,
+        prices: site.prices,
         currency: config.currency,
         timezone: tz,
         today: now().date,
@@ -243,7 +368,20 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         payments: mode === 'pay' ? true : undefined,
         // Paying by Bit or PayBox to this number, approved by hand.
         transfer: mode === 'transfer' ? { phone: localPhone(config.business.phone) } : undefined,
+        closedDays,
       });
+    }
+
+    // What the GitHub Pages copy needs to look like the site: David's content, the notices,
+    // the opening hours and the closed days. All of it is on the site's pages anyway.
+    if (route === 'GET /api/site') {
+      const today = now().date;
+      const editor = contentFor(env);
+      const [data, schedule] = await Promise.all([editor.publicSite(), store.getSchedule()]);
+      const closed = await editor.closedDays(today, addDays(today, schedule.maxDaysAhead));
+      const origin = request.headers.get('Origin');
+      const cors = origin && origin === pagesOrigin ? { 'Access-Control-Allow-Origin': origin } : {};
+      return json({ ...data, schedule, closed }, 200, { ...cors, Vary: 'Origin' });
     }
 
     if (route === 'GET /api/availability') {
@@ -270,7 +408,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       const transfer = mode === 'transfer';
       if (await overLimit(env.FORMS_LIMIT, `${ip} bookings`)) throw tooMany();
       const b = body;
-      const service = services.get(b.serviceId);
+      const site = await siteFor(env); // the prices David set
+      const service = site.services.find((s) => s.id === b.serviceId);
       const input = {
         serviceId: b.serviceId,
         date: b.date,
@@ -294,7 +433,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       if (bad.length) throw invalid(bad);
       // Bit or PayBox: one session, the card of sessions (this one included), or nothing now
       // for a session from a card the client already has.
-      const price = transfer ? (plan === 'pack' ? config.prices.pack.price : plan === 'card' ? 0 : service.price) : grow ? service.price : null;
+      const price = transfer ? (plan === 'pack' ? site.prices.pack.price : plan === 'card' ? 0 : service.price) : grow ? service.price : null;
 
       const busy = await calendarBusy(env, input.date, input.date);
       let booking;
@@ -394,7 +533,16 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
 
     if (route === 'GET /api/admin/session') {
       const admin = await currentAdmin(request, env);
-      return json({ enabled: true, loggedIn: Boolean(admin), passkeys: true, name: admin?.name, access: Boolean(accessSettings(env)) });
+      return json({
+        enabled: true,
+        loggedIn: Boolean(admin),
+        passkeys: true,
+        name: admin?.name,
+        access: Boolean(accessSettings(env)),
+        // The "האתר" tab: his texts, photos and notices (photos only once MEDIA is set up).
+        editor: true,
+        media: Boolean(env.MEDIA),
+      });
     }
 
     // Signing in with a passkey: a fresh challenge, which the phone signs after Face ID.
@@ -536,6 +684,52 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         return json({ ok: true });
       }
 
+      // ---------- The site: his texts, photos and prices, and the notices ----------
+      const editor = contentFor(env);
+
+      if (route === 'GET /api/admin/content') {
+        return json({
+          content: await editor.content(),
+          media: Boolean(env.MEDIA),
+          // As they come with the site, for "back to the original"
+          defaults: {
+            services: config.services.map((s) => ({ id: s.id, name: s.name.he, description: s.description.he, image: s.image })),
+            prices: { session: config.prices.session.price, packSessions: config.prices.pack.sessions, pack: config.prices.pack.price },
+          },
+        });
+      }
+
+      if (route === 'PUT /api/admin/content') {
+        const current = await editor.content();
+        const { content, bad } = applyContentPatch(current, body, { services: config.services });
+        if (bad.length) throw invalid(bad);
+        // A photo uploaded a moment ago must be there in every size before the site uses it.
+        if (!(await uploadsExist(env.MEDIA, newUploads(current, content)))) throw invalid(['photo_missing']);
+        await editor.saveContent(content);
+        return json({ content });
+      }
+
+      if (route === 'GET /api/admin/notices') return json({ notices: await editor.listNotices() });
+
+      if (route === 'POST /api/admin/notices') {
+        const { notice, bad } = noticeFields(body, { tz, now: clock() });
+        if (bad.length) throw invalid(bad);
+        return json({ notice: await editor.addNotice(notice) }, 201);
+      }
+
+      const noticePath = /^\/api\/admin\/notices\/(\d{1,12})$/.exec(path);
+      if (noticePath && method === 'PUT') {
+        const { notice, bad } = noticeFields(body, { tz, now: clock() });
+        if (bad.length) throw invalid(bad);
+        const row = await editor.updateNotice(Number(noticePath[1]), notice);
+        if (!row) throw notFound();
+        return json({ notice: row });
+      }
+      if (noticePath && method === 'DELETE') {
+        if (!(await editor.removeNotice(Number(noticePath[1])))) throw notFound();
+        return json({ ok: true });
+      }
+
       // ---------- David's clients ----------
       const clientFields = (b) => {
         const c = { name: str(b.name, 80), phone: phoneKey(str(b.phone, 30)), email: str(b.email, 120), notes: str(b.notes, 2000), cardLeft: b.cardLeft ?? 0 };
@@ -597,7 +791,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         await store.markBookingApproved(booking.id);
         let cardLeft = null;
         const clientId = await admins.clientFromBooking(booking);
-        if (clientId && booking.plan === 'pack') cardLeft = await admins.addCardSessions(clientId, config.prices.pack.sessions - 1);
+        const pack = (await siteFor(env)).prices.pack;
+        if (clientId && booking.plan === 'pack') cardLeft = await admins.addCardSessions(clientId, pack.sessions - 1);
         if (clientId && booking.plan === 'card') cardLeft = await admins.addCardSessions(clientId, -1);
         ctx?.waitUntil?.(afterConfirmed(env, store, booking)); // the calendar
         return json({ booking, cardLeft });
@@ -694,6 +889,15 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     }
     await store.expireHolds();
     await openAdminStore(env.DB, clock).purge();
+    // Once a day: photos he uploaded that nothing on the site uses any more.
+    const at = clock();
+    if (env.MEDIA && at.getUTCHours() === 2 && at.getUTCMinutes() < 10) {
+      try {
+        await removeUnusedUploads(env.MEDIA, await contentFor(env).content(), at);
+      } catch (err) {
+        log.error('Removing unused photos failed:', err?.message || String(err));
+      }
+    }
     if (calendarSettings(env)) {
       for (const booking of await store.missingFromCalendar(now().date)) await afterConfirmed(env, store, booking);
     }
@@ -705,7 +909,18 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       try {
         if (url.pathname === '/healthz') return json({ ok: true });
         if (url.pathname.startsWith('/api/')) return await api(request, env, url, ctx);
-        // Pages and files: Cloudflare serves them without the Worker (wrangler.jsonc →
+        const read = request.method === 'GET' || request.method === 'HEAD';
+        const photo = /^\/media\/([a-z2-7]{16}-\d{3,4})\.jpg$/.exec(url.pathname);
+        if (photo && read) return await media(request, env, photo[1]);
+        if (PAGES.has(url.pathname) && read) {
+          try {
+            return await page(request, env, url);
+          } catch (err) {
+            log.error('Serving the page failed:', err?.stack || String(err));
+            return env.ASSETS.fetch(request);
+          }
+        }
+        // Other pages and files: Cloudflare serves them without the Worker (wrangler.jsonc →
         // assets.run_worker_first), so this is only a fallback.
         return env.ASSETS.fetch(request);
       } catch (err) {

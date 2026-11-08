@@ -26,6 +26,13 @@ test('GitHub Pages build produces a working single page', () => {
     }
   }
 
+  // David's changes in the admin panel come from the site on Cloudflare (its /api/site).
+  assert.match(html, /const REMOTE_ORIGIN = "https:\/\/clinic\.davidneeman\.workers\.dev";/);
+  assert.match(html, /refreshSiteData\(\);\n {2}<\/script>/);
+  assert.ok(html.indexOf('const CONTENT_SECTIONS') < html.indexOf('const pristineHebrew'), 'the content model comes before the page script');
+  assert.match(html, /const mediaBase = \(\) => REMOTE_ORIGIN;/);
+  assert.match(html, /localStorage\.getItem\('site-data'\)/);
+
   // The inline module must parse.
   const script = html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
   const file = path.join(out, 'check.mjs');

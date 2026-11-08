@@ -5908,6 +5908,808 @@ html.js .reveal:not(.is-visible) {
   box-shadow: var(--shadow);
 }
 
+/* ==========================================================================
+   Notices at the top of the site (written in the admin panel's "האתר" tab)
+   ========================================================================== */
+
+.site-notices {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) var(--gutter) 0;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding: 11px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  animation: notice-in 0.6s var(--ease) both;
+}
+
+.notice-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.notice-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.notice-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice-tag {
+  display: inline-block;
+  margin-inline-end: 8px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.75;
+  vertical-align: 1px;
+}
+
+.notice-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-block: -10px;
+  margin-inline: -4px -10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.notice-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.notice-close:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.notice-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+
+.notice-news {
+  background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface));
+}
+
+.notice-alert {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.notice-alert .notice-icon {
+  color: var(--on-accent);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Texts written in the admin panel keep their line breaks. */
+.about-text p,
+.section-lead,
+.stack-desc,
+.prep li > span:last-child {
+  white-space: pre-line;
+}
+
+/* ==========================================================================
+   Admin panel: the "האתר" tab – notices, then the site's texts, prices and photos
+   ========================================================================== */
+
+.site-part + .site-part {
+  margin-top: 44px;
+}
+
+.site-part-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+
+.site-part-head .subhead {
+  margin-top: 0;
+}
+
+.site-part-head .panel-sub {
+  max-width: 62ch;
+  margin: 0;
+}
+
+.notice-preview {
+  animation: none;
+}
+
+.notice-item .item-body {
+  display: grid;
+  gap: 10px;
+}
+
+.notice-item:is(.is-paused, .is-ended) .notice-preview {
+  opacity: 0.55;
+}
+
+.notice-status {
+  margin: 0;
+}
+
+.notice-chip-live {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.notice-item .notice-closing {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.notice-form {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.notice-form .subhead {
+  margin: 0;
+}
+
+.kind-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.kind-options legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 0.94rem;
+  font-weight: 500;
+}
+
+.kind-option {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* (the real radio button lies over its whole card, so it's what a tap or a screen reader finds) */
+.kind-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.kind-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.kind-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.kind-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+}
+
+.kind-text {
+  display: grid;
+  line-height: 1.35;
+}
+
+.kind-text small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 460px) {
+  .kind-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kind-option {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 14px;
+    text-align: start;
+  }
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.minihead {
+  margin: 4px 0 -8px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.close-days {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.close-days .field-hint {
+  margin: 0;
+}
+
+.char-count {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The site's content: one folding part per section of the home page */
+.edit-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.edit-section + .edit-section {
+  margin-top: 10px;
+}
+
+.edit-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  list-style: none;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.edit-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.edit-section > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.edit-section-name {
+  flex: 1;
+}
+
+.edit-chevron {
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+  transition: transform 0.3s var(--ease);
+}
+
+.edit-section[open] .edit-chevron {
+  transform: rotate(180deg);
+}
+
+.edit-body {
+  display: grid;
+  gap: 24px;
+  padding: 6px 18px 22px;
+}
+
+.edit-field textarea {
+  min-height: 96px;
+  overflow-y: auto;
+}
+
+.field-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.field-foot .char-count {
+  margin-inline-start: auto;
+}
+
+.edit-body .field-hint {
+  margin: 0;
+}
+
+.photo-group {
+  display: grid;
+  gap: 14px;
+}
+
+.photo-field {
+  display: grid;
+  gap: 10px;
+}
+
+.photo-field.has-error .photo-frame {
+  outline: 2px solid var(--danger);
+  outline-offset: 3px;
+}
+
+.photo-label {
+  margin: 0;
+  font-size: 0.94rem;
+  font-weight: 500;
+}
+
+.photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.photo-frame {
+  position: relative;
+  flex: none;
+  width: 120px;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--photo-bg);
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-frame-hero,
+.crop-frame-hero {
+  border-radius: 999px 999px 0 0;
+}
+
+.photo-frame-service {
+  aspect-ratio: 1;
+}
+
+.photo-fan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.photo-actions {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.photo-actions .btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.builtin-list {
+  display: flex;
+  gap: 10px;
+  padding: 4px 2px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+
+.builtin-photo {
+  flex: none;
+  display: grid;
+  gap: 6px;
+  width: 86px;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: center;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.builtin-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 999px 999px 4px 4px;
+}
+
+.builtin-photo[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.builtin-photo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.service-edit-list {
+  display: grid;
+  gap: 16px;
+}
+
+.service-edit {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.service-edit legend {
+  padding: 0 8px;
+  font-weight: 600;
+}
+
+.form-row-3 {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.gallery-edit {
+  display: grid;
+  gap: 12px;
+}
+
+.gallery-rows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gallery-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-areas:
+    'thumb actions'
+    'field field';
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.gallery-thumb {
+  grid-area: thumb;
+  width: 72px;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--photo-bg);
+}
+
+.gallery-row .field {
+  grid-area: field;
+}
+
+.gallery-row-actions {
+  grid-area: actions;
+}
+
+/* Wide screens: the photo, its description and the buttons on one line */
+@media (min-width: 760px) {
+  .gallery-row {
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    grid-template-areas: 'thumb field actions';
+  }
+}
+
+.gallery-row .field label {
+  font-size: 0.85rem;
+}
+
+.gallery-row .field input {
+  min-height: 46px;
+  padding-block: 8px;
+}
+
+.gallery-row-actions {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.gallery-row-actions .icon-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* While there are changes to save: a bar that stays at the bottom of the screen */
+.save-bar {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  margin-top: 24px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--header-bg);
+  box-shadow: var(--shadow-lift);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+.save-bar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-bar-text {
+  flex: 1 1 140px;
+  font-weight: 600;
+}
+
+#save-alert:empty {
+  display: none;
+}
+
+#save-alert .alert {
+  margin-top: 8px;
+}
+
+/* Framing a photo before it's uploaded: the frame takes whatever room the screen leaves, and
+   the buttons always show (on a phone the dialog fills the screen) */
+.crop-dialog {
+  width: min(560px, calc(100vw - 32px));
+  height: min(860px, calc(100dvh - 32px));
+  max-width: none;
+  max-height: none;
+}
+
+.crop-dialog .dialog-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 20px;
+}
+
+.crop-dialog h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.crop-dialog .panel-sub {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.crop-dialog .panel-actions {
+  margin: 0;
+}
+
+.crop-stage {
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+}
+
+@media (max-width: 560px) {
+  .crop-dialog {
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    border: 0;
+  }
+
+  .crop-dialog .dialog-inner {
+    padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.crop-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--photo-bg);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.crop-frame.crop-frame-hero {
+  border-radius: 999px 999px 0 0;
+}
+
+.crop-frame:active {
+  cursor: grabbing;
+}
+
+.crop-frame:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* The arch's window in the editor: drawn at once, without the home page's entrance */
+.photo-fan .fanlight path {
+  animation: none !important;
+  stroke-dasharray: none;
+}
+
+.crop-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.crop-zoom input {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+.crop-zoom input:focus {
+  box-shadow: none;
+}
+
+.crop-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Admin forms never grow wider than the screen: a field as wide as its content (a date and
+   time field is) shrinks to the column instead of pushing the form out. */
+.admin-wrap :is(.form, .edit-body, .service-edit, .photo-group, .photo-field, .gallery-edit, .close-days, .field) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Phones: the admin tabs in rows of three, all of them in sight */
+@media (max-width: 560px) {
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    border-radius: 24px;
+  }
+
+  .tab {
+    padding: 9px 4px;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+}
+
+/* Phones: each day's opening hours fit the width (two time fields and the remove button) */
+@media (max-width: 560px) {
+  .ranges {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .range input {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .range .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* A notice shown in the admin list keeps the site's colors (not the list's grey text) */
+.item-body .notice-text {
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Red text (remove buttons, errors) dark enough to read on the light background (4.5:1) */
+:root[data-look='2ln']:not([data-theme='dark']) {
+  --danger: #9a3a2c;
+}
+
   </style>
 </head>
 <body data-title-key="meta.homeTitle">
@@ -5967,7 +6769,7 @@ html.js .reveal:not(.is-visible) {
           <ul class="hero-treatments" id="hero-treatments" data-i18n-attr="aria-label:nav.treatments"></ul>
         </div>
         <figure class="hero-room" aria-hidden="true" data-parallax="18">
-          <img src="images/room.jpg" srcset="images/room-640.jpg 640w, images/room.jpg 960w, images/room-1440.jpg 1440w" sizes="(max-width: 900px) 92vw, 46vw" alt="" width="960" height="1200" loading="lazy">
+          <img data-photo="hero" src="images/room.jpg" srcset="images/room-640.jpg 640w, images/room.jpg 960w, images/room-1440.jpg 1440w" sizes="(max-width: 900px) 92vw, 46vw" alt="" width="960" height="1200" loading="lazy">
           <svg class="fanlight" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path pathLength="1" d="M100 100H0"></path><path pathLength="1" d="M100 100H200"></path><path pathLength="1" d="M124 100A24 24 0 0 0 76 100"></path><path pathLength="1" d="M122.17 90.82L192.39 61.73"></path><path pathLength="1" d="M116.97 83.03L170.71 29.29"></path><path pathLength="1" d="M109.18 77.83L138.27 7.61"></path><path pathLength="1" d="M100 76L100 0"></path><path pathLength="1" d="M90.82 77.83L61.73 7.61"></path><path pathLength="1" d="M83.03 83.03L29.29 29.29"></path><path pathLength="1" d="M77.83 90.82L7.61 61.73"></path></svg>
         </figure>
       </div>
@@ -5981,7 +6783,7 @@ html.js .reveal:not(.is-visible) {
             <span class="sec-num" aria-hidden="true">01</span>
             <h2 class="section-title" data-i18n="treatments.title"></h2>
           </div>
-          <p class="section-lead" data-i18n="treatments.lead"></p>
+          <p class="section-lead" data-i18n="treatments.lead" data-optional></p>
         </header>
         <ol class="stack" id="services-list" aria-live="polite"></ol>
         <!-- Prices: a session, and a card of sessions (config/site.json → prices) -->
@@ -6028,15 +6830,15 @@ html.js .reveal:not(.is-visible) {
         <div class="about">
           <figure class="about-photo reveal" data-parallax="16">
             <div class="blob">
-              <img src="images/about.jpg" srcset="images/about.jpg 900w, images/about-1350.jpg 1350w, images/about-1800.jpg 1800w" sizes="(max-width: 900px) 92vw, 45vw" alt="דוד נאמן בקליניקה" width="900" height="1125" loading="lazy">
+              <img data-photo="about" src="images/about.jpg" srcset="images/about.jpg 900w, images/about-1350.jpg 1350w, images/about-1800.jpg 1800w" sizes="(max-width: 900px) 92vw, 45vw" alt="דוד נאמן בקליניקה" width="900" height="1125" loading="lazy">
             </div>
           </figure>
           <div class="about-text reveal">
             <span class="sec-num" aria-hidden="true">03</span>
             <h2 class="section-title" data-i18n="about.title"></h2>
             <p class="about-lead" data-i18n="about.p1"></p>
-            <p data-i18n="about.p2"></p>
-            <p data-i18n="about.p3"></p>
+            <p data-i18n="about.p2" data-optional></p>
+            <p data-i18n="about.p3" data-optional></p>
           </div>
         </div>
         <figure class="statement">
@@ -6082,8 +6884,8 @@ html.js .reveal:not(.is-visible) {
             <h3 class="visit-h"><span data-icon="leaf"></span><span data-i18n="visit.prep"></span></h3>
             <ul class="prep">
               <li><span class="prep-icon" data-icon="clock"></span><span data-i18n="visit.prep1"></span></li>
-              <li><span class="prep-icon" data-icon="shirt"></span><span data-i18n="visit.prep2"></span></li>
-              <li><span class="prep-icon" data-icon="calendarX"></span><span data-i18n="visit.prep3"></span></li>
+              <li data-optional><span class="prep-icon" data-icon="shirt"></span><span data-i18n="visit.prep2"></span></li>
+              <li data-optional><span class="prep-icon" data-icon="calendarX"></span><span data-i18n="visit.prep3"></span></li>
             </ul>
           </div>
         </div>
@@ -6719,6 +7521,108 @@ const dictionaries = {
       copied: 'הועתק',
       shareWhatsapp: 'שליחה בוואטסאפ',
       inviteMessage: 'קישור לכניסה לניהול האתר (עובד פעם אחת, תקף {hours} שעות): {link}\nבפעמים הבאות נכנסים מ"ניהול" בתחתית האתר, עם Face\u00a0ID.',
+      // The "האתר" tab: notices at the top of the site, and its texts, prices and photos
+      tabSite: 'האתר',
+      noticesTitle: 'הודעות באתר',
+      noticesSub: 'הודעה קצרה שמופיעה בראש כל דפי האתר – למשל ״הקליניקה סגורה עד 20.11״, או משהו חדש.',
+      noticeAdd: 'הודעה חדשה',
+      noticeEdit: 'עריכת ההודעה',
+      noticeNone: 'אין כרגע הודעות באתר.',
+      noticeEmpty: 'הטקסט יופיע כאן',
+      noticeKind: 'סוג ההודעה',
+      kind_info: 'עדכון',
+      kind_info_sub: 'הודעה רגילה',
+      kind_news: 'חדש',
+      kind_news_sub: 'משהו חדש בקליניקה',
+      kind_alert: 'חשוב',
+      kind_alert_sub: 'למשל סגירה זמנית – מופיעה תמיד, בלי כפתור סגירה',
+      noticeText: 'הטקסט',
+      noticeWhen: 'מתי היא מופיעה',
+      noticeFrom: 'התחלה',
+      noticeFromHint: 'ריק – מעכשיו',
+      noticeUntil: 'סיום',
+      noticeUntilHint: 'ריק – עד שמכבים אותה',
+      clear: 'ניקוי',
+      noticeClose: 'לסגור את היומן להזמנות בימים האלה',
+      noticeCloseFrom: 'מיום',
+      noticeCloseTo: 'עד יום (כולל)',
+      noticeCloseHint: 'תורים שכבר נקבעו בימים האלה נשארים – כדאי לבדוק בלשונית ״פגישות״. הימים מופיעים גם ב״יומן״, ונפתחים שוב כשמשהים או מוחקים את ההודעה.',
+      noticePreview: 'כך זה ייראה באתר',
+      noticeSaved: 'ההודעה נשמרה',
+      noticeDeleteConfirm: 'למחוק את ההודעה? אם היא סגרה ימים ביומן, הם ייפתחו שוב.',
+      noticeDeleted: 'ההודעה נמחקה',
+      noticeShowing: 'מופיעה באתר עכשיו',
+      noticeShowingUntil: 'מופיעה באתר עד {date}',
+      noticeScheduled: 'תופיע באתר מ־{date}',
+      noticeEnded: 'הסתיימה ב־{date}',
+      noticePaused: 'מושהית – לא מופיעה באתר',
+      noticeClosing: 'היומן סגור להזמנות: {from} – {to}',
+      noticePause: 'השהיה',
+      noticeResume: 'הפעלה',
+      noticePausedToast: 'ההודעה הושהתה',
+      noticeOnToast: 'ההודעה הופעלה',
+      noticeCantResume: 'אי אפשר להפעיל אותה כך – נא לפתוח ״עריכה״ ולבדוק את התאריכים.',
+      noticeTextNeeded: 'נא לכתוב את ההודעה (2–280 תווים).',
+      noticeWhenInvalid: 'נא לבדוק את התאריך והשעה.',
+      noticeEndInvalid: 'הסיום צריך להיות אחרי ההתחלה.',
+      noticeCloseInvalid: 'נא לבחור את שני הימים (עד שנה), כשהראשון לא אחרי השני.',
+      edit: 'עריכה',
+      closedByNotice: 'נסגר בהודעה באתר (וייפתח איתה)',
+      contentTitle: 'תוכן האתר',
+      contentSub: 'הטקסטים, הציטוט, המחירים והתמונות. פותחים חלק, משנים ולוחצים ״שמירה״ – השינוי מופיע באתר מיד.',
+      changedHere: 'שונה',
+      unsaved: 'יש שינויים שלא נשמרו',
+      discard: 'ביטול השינויים',
+      discardConfirm: 'לבטל את כל השינויים שעוד לא נשמרו?',
+      contentSaved: 'נשמר – השינויים כבר באתר',
+      fixFields: 'יש שדות שצריך לתקן (מסומנים באדום).',
+      fieldRefused: 'אי אפשר לשמור את זה כך – נא לבדוק.',
+      photoMissing: 'תמונה שהועלתה לא נשמרה עד הסוף. נא להעלות אותה שוב.',
+      originally: 'במקור: {text}',
+      toOriginal: 'החזרת המקור',
+      optional: 'לא חובה',
+      emptyHides: 'ריק – לא יופיע באתר',
+      required: 'זה לא יכול להיות ריק',
+      photoAlt: 'תיאור התמונה',
+      photoAltHint: 'למי שלא רואה את התמונה (קוראי מסך), ולגוגל.',
+      photoChange: 'החלפת תמונה',
+      photoPickHint: 'מהגלריה של הטלפון, או צילום חדש',
+      photoBuiltin: 'או אחת מהתמונות שכבר באתר:',
+      mediaOff: 'העלאת תמונות עוד לא מחוברת באתר.',
+      serviceName: 'שם הטיפול',
+      serviceDescription: 'התיאור',
+      servicePhoto: 'התמונה',
+      pricesTitle: 'מחירים',
+      priceSession: 'מפגש (₪)',
+      pricePackSessions: 'מפגשים בכרטיסייה',
+      pricePack: 'הכרטיסייה (₪)',
+      pricesNote: 'המחירים מופיעים באתר ובקביעת התור, ולפיהם נקבע הסכום להעברה בביט או בפייבוקס. מחיר המפגש הוא לכל אחד מהטיפולים.',
+      galleryHint: 'התמונות מופיעות לפי הסדר הזה. אפשר להזיז, להחליף, להסיר ולהוסיף (עד {n}).',
+      galleryPhoto: 'תמונה {n}',
+      galleryUp: 'הזזה למעלה',
+      galleryDown: 'הזזה למטה',
+      galleryReplace: 'החלפה',
+      galleryRemove: 'הסרה',
+      galleryRemoveConfirm: 'להסיר את התמונה מהגלריה?',
+      galleryAdd: 'הוספת תמונה',
+      galleryReset: 'החזרת הגלריה המקורית',
+      galleryResetConfirm: 'להחזיר את הגלריה כמו שהייתה במקור?',
+      cropTitle: 'מה רואים בתמונה',
+      cropHelp: 'גוררים את התמונה כדי לבחור מה רואים בצורה הזו, ומגדילים עם המחוון (או בצביטה עם שתי אצבעות).',
+      cropFrame: 'התמונה. אפשר להזיז אותה בחצים, ולהגדיל ב־+ וב־-',
+      cropZoom: 'הגדלה',
+      cropUse: 'שימוש בתמונה',
+      cancelAction: 'ביטול',
+      uploading: 'מעלה את התמונה… ({n} מתוך {total})',
+      uploadFailed: 'ההעלאה לא הצליחה. אפשר לנסות שוב.',
+      photoUnreadable: 'אי אפשר לפתוח את הקובץ הזה כתמונה. אפשר לנסות תמונה אחרת.',
+      photoSmall: 'התמונה קטנה, ועלולה להיראות מטושטשת במסכים גדולים.',
+    },
+    // Notices at the top of the site (from the admin panel)
+    notice: {
+      region: 'הודעות מהקליניקה',
+      new: 'חדש',
+      close: 'סגירת ההודעה',
     },
     notFound: {
       title: 'העמוד לא נמצא',
@@ -7080,6 +7984,107 @@ const dictionaries = {
       copied: 'Copied',
       shareWhatsapp: 'Send on WhatsApp',
       inviteMessage: 'Link to sign in to the site admin (works once, valid for {hours} hours): {link}\nNext time, use "Admin" at the bottom of the site, with Face\u00a0ID.',
+      // The "Website" tab: notices at the top of the site, and its texts, prices and photos
+      tabSite: 'Website',
+      noticesTitle: 'Notices on the site',
+      noticesSub: 'A short message at the top of every page – for example "The clinic is closed until 20 Nov", or something new.',
+      noticeAdd: 'New notice',
+      noticeEdit: 'Edit the notice',
+      noticeNone: 'No notices on the site right now.',
+      noticeEmpty: 'The text shows here',
+      noticeKind: 'Kind',
+      kind_info: 'Update',
+      kind_info_sub: 'An ordinary message',
+      kind_news: 'New',
+      kind_news_sub: 'Something new at the clinic',
+      kind_alert: 'Important',
+      kind_alert_sub: 'For example closed for a while – always shows, with no close button',
+      noticeText: 'Text',
+      noticeWhen: 'When it shows',
+      noticeFrom: 'Starts',
+      noticeFromHint: 'Empty – from now',
+      noticeUntil: 'Ends',
+      noticeUntilHint: 'Empty – until it’s turned off',
+      clear: 'Clear',
+      noticeClose: 'Close the calendar to bookings on these days',
+      noticeCloseFrom: 'From',
+      noticeCloseTo: 'To (including)',
+      noticeCloseHint: 'Bookings already made on these days stay – check the Bookings tab. The days also show in Schedule, and open again when the notice is paused or deleted.',
+      noticePreview: 'How it looks on the site',
+      noticeSaved: 'Notice saved',
+      noticeDeleteConfirm: 'Delete this notice? Any days it closed in the calendar open again.',
+      noticeDeleted: 'Notice deleted',
+      noticeShowing: 'Showing on the site now',
+      noticeShowingUntil: 'Showing until {date}',
+      noticeScheduled: 'Shows from {date}',
+      noticeEnded: 'Ended {date}',
+      noticePaused: 'Paused – not showing',
+      noticeClosing: 'Calendar closed to bookings: {from} – {to}',
+      noticePause: 'Pause',
+      noticeResume: 'Turn on',
+      noticePausedToast: 'Notice paused',
+      noticeOnToast: 'Notice on',
+      noticeCantResume: 'It can’t be turned on like this – open Edit and check the dates.',
+      noticeTextNeeded: 'Please write the notice (2–280 characters).',
+      noticeWhenInvalid: 'Please check the date and time.',
+      noticeEndInvalid: 'The end must be after the start.',
+      noticeCloseInvalid: 'Please pick both days (up to a year), the first not after the second.',
+      edit: 'Edit',
+      closedByNotice: 'Closed by a notice on the site (opens with it)',
+      contentTitle: 'The site’s content',
+      contentSub: 'Texts, the quote, prices and photos. Open a part, change it and press Save – it shows on the site at once.',
+      changedHere: 'Changed',
+      unsaved: 'Unsaved changes',
+      discard: 'Discard changes',
+      discardConfirm: 'Discard all the changes that aren’t saved yet?',
+      contentSaved: 'Saved – the changes are on the site',
+      fixFields: 'Some fields need fixing (marked in red).',
+      fieldRefused: 'This can’t be saved like this – please check it.',
+      photoMissing: 'A photo that was uploaded didn’t finish. Please upload it again.',
+      originally: 'Originally: {text}',
+      toOriginal: 'Back to the original',
+      optional: 'optional',
+      emptyHides: 'Empty – won’t show on the site',
+      required: 'This can’t be empty',
+      photoAlt: 'Photo description',
+      photoAltHint: 'For people who can’t see the photo (screen readers), and for Google.',
+      photoChange: 'Replace photo',
+      photoPickHint: 'From the phone’s photos, or take one',
+      photoBuiltin: 'Or one of the site’s photos:',
+      mediaOff: 'Uploading photos isn’t connected on the site yet.',
+      serviceName: 'Treatment name',
+      serviceDescription: 'Description',
+      servicePhoto: 'Photo',
+      pricesTitle: 'Prices',
+      priceSession: 'Session (₪)',
+      pricePackSessions: 'Sessions on the card',
+      pricePack: 'The card (₪)',
+      pricesNote: 'The prices show on the site and when booking, and set the amount to transfer by Bit or PayBox. The session price is for each of the treatments.',
+      galleryHint: 'The photos show in this order. You can move, replace, remove and add photos (up to {n}).',
+      galleryPhoto: 'Photo {n}',
+      galleryUp: 'Move up',
+      galleryDown: 'Move down',
+      galleryReplace: 'Replace',
+      galleryRemove: 'Remove',
+      galleryRemoveConfirm: 'Remove this photo from the gallery?',
+      galleryAdd: 'Add a photo',
+      galleryReset: 'Back to the original gallery',
+      galleryResetConfirm: 'Put the gallery back as it was originally?',
+      cropTitle: 'Frame the photo',
+      cropHelp: 'Drag the photo to choose what shows in this shape, and zoom with the slider (or pinch with two fingers).',
+      cropFrame: 'The photo. Move it with the arrow keys, zoom with + and -',
+      cropZoom: 'Zoom',
+      cropUse: 'Use this photo',
+      cancelAction: 'Cancel',
+      uploading: 'Uploading the photo… ({n} of {total})',
+      uploadFailed: 'The upload didn’t work. You can try again.',
+      photoUnreadable: 'This file can’t be opened as a photo. Try another one.',
+      photoSmall: 'The photo is small and may look soft on big screens.',
+    },
+    notice: {
+      region: 'Notices from the clinic',
+      new: 'New',
+      close: 'Close the notice',
     },
     notFound: {
       title: 'Page not found',
@@ -7101,6 +8106,14 @@ const PATHS = {
   sparkle: '<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+  trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  up: '<path d="m18 15-6-6-6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   checkCircle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
   phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/>',
@@ -7142,6 +8155,304 @@ function hydrateIcons(root = document) {
     el.innerHTML = svg(el.dataset.icon, el.dataset.iconClass || '');
   }
 }
+
+// What David can change on the site himself, in the admin panel's "האתר" tab: the texts (the
+// quote included), the treatments' names, descriptions and photos, the prices, the opening and
+// "about" photos, and the gallery with its descriptions.
+//
+// His changes are kept as one document ("content") on the server:
+//   { texts:    { "about.quote": "…" },                       ← keys of the Hebrew dictionary (i18n.js)
+//     services: { "stress": { name, description, photo } },  ← per treatment (config/site.json)
+//     photos:   { hero: <photo>, about: <photo> },  aboutAlt: "…",
+//     gallery:  [{ photo: <photo>, alt: "…" }, …],
+//     prices:   { session: 350, packSessions: 4, pack: 1200 } }
+// where a <photo> is { builtin: "david-2" } (a photo that comes with the site, in images/) or
+// { upload: "<id>" } (one he uploaded from his phone; served from /media/).
+// Anything missing stays as it comes with the site.
+//
+// Used by the pages, the admin panel and the Worker (worker/content.js), so it imports nothing
+// and keeps its names distinctive (the GitHub Pages build puts all the scripts in one).
+
+const SECTION_TITLE = { he: 'כותרת הפרק', en: 'Section title' };
+
+const CONTENT_SECTIONS = [
+  {
+    id: 'hero',
+    label: { he: 'הפתיחה', en: 'Opening screen' },
+    items: [
+      { text: 'hero.titleA', label: { he: 'הכותרת – החלק הראשון', en: 'Headline – first part' }, max: 30 },
+      { text: 'hero.titleB', label: { he: 'הכותרת – החלק המודגש', en: 'Headline – highlighted part' }, max: 30 },
+      { photo: 'hero', label: { he: 'התמונה בחלון הקשת', en: 'The photo in the arch' } },
+    ],
+  },
+  {
+    id: 'treatments',
+    label: { he: 'טיפולים ומחירים', en: 'Treatments and prices' },
+    items: [
+      { text: 'treatments.title', also: ['nav.treatments'], label: SECTION_TITLE, max: 40 },
+      { text: 'treatments.lead', label: { he: 'פסקת הפתיחה', en: 'Intro paragraph' }, max: 800, multiline: true, optional: true },
+      { services: true },
+      { prices: true },
+    ],
+  },
+  {
+    id: 'gallery',
+    label: { he: 'גלריה', en: 'Gallery' },
+    items: [
+      { text: 'gallery.title', also: ['nav.gallery'], label: SECTION_TITLE, max: 40 },
+      { gallery: true },
+    ],
+  },
+  {
+    id: 'about',
+    label: { he: 'קצת עליי', en: 'About' },
+    items: [
+      { text: 'about.title', also: ['nav.about'], label: SECTION_TITLE, max: 40 },
+      { photo: 'about', label: { he: 'התמונה', en: 'Photo' } },
+      { text: 'about.p1', label: { he: 'פסקה ראשונה', en: 'First paragraph' }, max: 1200, multiline: true },
+      { text: 'about.p2', label: { he: 'פסקה שנייה', en: 'Second paragraph' }, max: 1200, multiline: true, optional: true },
+      { text: 'about.p3', label: { he: 'פסקה שלישית', en: 'Third paragraph' }, max: 1200, multiline: true, optional: true },
+      { text: 'about.quote', label: { he: 'הציטוט', en: 'The quote' }, max: 300, multiline: true },
+    ],
+  },
+  {
+    id: 'visit',
+    label: { he: 'כתובת ושעות', en: 'Address and hours' },
+    items: [
+      { text: 'visit.title', also: ['nav.visit'], label: SECTION_TITLE, max: 40 },
+      { text: 'visit.parking', label: { he: 'חניה', en: 'Parking' }, max: 200 },
+      { text: 'visit.booking', also: ['book.lead'], label: { he: 'המשפט מתחת לשעות', en: 'The line under the hours' }, max: 200 },
+      { text: 'visit.prep1', label: { he: 'לפני הטיפול – 1', en: 'Before the session – 1' }, max: 300, multiline: true },
+      { text: 'visit.prep2', label: { he: 'לפני הטיפול – 2', en: 'Before the session – 2' }, max: 300, multiline: true, optional: true },
+      { text: 'visit.prep3', label: { he: 'לפני הטיפול – 3', en: 'Before the session – 3' }, max: 300, multiline: true, optional: true },
+    ],
+  },
+  {
+    id: 'contact',
+    label: { he: 'יצירת קשר', en: 'Contact' },
+    items: [{ text: 'contact.title', label: SECTION_TITLE, max: 60 }],
+  },
+];
+
+const TEXT_FIELDS = CONTENT_SECTIONS.flatMap((s) => s.items.filter((i) => i.text));
+
+// The treatments' own fields (per treatment in config/site.json).
+const SERVICE_LIMITS = { name: 40, description: 1200 };
+const GALLERY_LIMITS = { photos: 24, alt: 160 };
+const PRICE_LIMITS = { session: [0, 5000], packSessions: [2, 20], pack: [0, 50000] };
+
+// ---------------------------------------------------------------------------
+// Photos
+// ---------------------------------------------------------------------------
+
+// Where a photo goes, its shape (width / height), the widths an upload is saved in, and the
+// photos that come with the site that fit there.
+const PHOTO_SLOTS = {
+  hero: { ratio: 4 / 5, widths: [640, 1080, 1600], builtins: ['room', 'david-1', 'david-2', 'david-3'] },
+  about: { ratio: 4 / 5, widths: [640, 1080, 1600], builtins: ['about'] },
+  service: { ratio: 1, widths: [300, 700, 1200], builtins: ['svc-dry', 'svc-cosmetic', 'svc-stress'] },
+  gallery: { ratio: 4 / 5, widths: [720, 1080, 1600], builtins: ['gal-1', 'gal-2', 'gal-3', 'gal-4', 'gal-5', 'gal-6', 'gal-7', 'gal-8', 'gal-9'] },
+};
+
+// An uploaded photo's id: 16 random letters and digits (base32).
+const UPLOAD_ID_RE = /^[a-z2-7]{16}$/;
+
+const archPhoto = (id, label) => ({
+  label,
+  w: 960,
+  h: 1200,
+  set: [[`images/${id}-640.jpg`, 640], [`images/${id}.jpg`, 960], [`images/${id}-1440.jpg`, 1440]],
+});
+const galleryPhoto = (n) => ({
+  w: 720,
+  h: 900,
+  set: [[`images/gal-${n}.jpg`, 720], [`images/gal-${n}-1080.jpg`, 1080]],
+  large: `images/large/gal-${n}.jpg`,
+});
+const servicePhoto = (id) => ({
+  w: 700,
+  h: 700,
+  set: [[`images/${id}-300.jpg`, 300], [`images/${id}.jpg`, 700], [`images/${id}-1200.jpg`, 1200], [`images/${id}-1600.jpg`, 1600]],
+});
+
+const BUILTIN_PHOTOS = {
+  room: archPhoto('room', { he: 'חדר הטיפולים', en: 'The treatment room' }),
+  'david-1': archPhoto('david-1', { he: 'דוד – 1', en: 'David – 1' }),
+  'david-2': archPhoto('david-2', { he: 'דוד – 2', en: 'David – 2' }),
+  'david-3': archPhoto('david-3', { he: 'דוד – 3', en: 'David – 3' }),
+  about: { w: 900, h: 1125, set: [['images/about.jpg', 900], ['images/about-1350.jpg', 1350], ['images/about-1800.jpg', 1800]] },
+  ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`gal-${n}`, galleryPhoto(n)])),
+  'svc-dry': servicePhoto('svc-dry'),
+  'svc-cosmetic': servicePhoto('svc-cosmetic'),
+  'svc-stress': servicePhoto('svc-stress'),
+};
+
+// The gallery as it comes with the site (the same photos and descriptions as index.html).
+const DEFAULT_GALLERY = [
+  'טיפול בכוסות רוח בקליניקה',
+  'סימני כוסות רוח ודיקור בגב העליון',
+  'דיקור בגב',
+  'כוסות רוח לאורך עמוד השדרה',
+  'כוסות רוח לאורך הגב',
+  'דיקור לאורך הגב',
+  'דיקור וסימני כוסות רוח בגב',
+  'כוסות רוח בגב התחתון ודיקור לאורך הגב',
+  'דיקור לאורך עמוד השדרה',
+].map((alt, i) => ({ photo: { builtin: `gal-${i + 1}` }, alt }));
+const DEFAULT_PHOTOS = { hero: { builtin: 'room' }, about: { builtin: 'about' } };
+const DEFAULT_ABOUT_ALT = 'דוד נאמן בקליניקה';
+
+/** The photo that comes with a treatment ("images/svc-dry.jpg" → { builtin: "svc-dry" }). */
+const serviceDefaultPhoto = (service) => {
+  const id = /^images\/([\w-]+)\.jpg$/.exec(service?.image || '')?.[1];
+  return id && BUILTIN_PHOTOS[id] ? { builtin: id } : null;
+};
+
+/** True for a photo that may go in this slot. */
+function isPhotoRef(ref, slot) {
+  const spec = PHOTO_SLOTS[slot];
+  if (!spec || !ref || typeof ref !== 'object' || Array.isArray(ref) || Object.keys(ref).length !== 1) return false;
+  if (typeof ref.builtin === 'string') return spec.builtins.includes(ref.builtin);
+  return typeof ref.upload === 'string' && UPLOAD_ID_RE.test(ref.upload);
+}
+
+/**
+ * Everything an <img> needs for a photo: { src, srcset, width, height, large, byWidth }.
+ * `base` comes before an uploaded photo's address: '' on the site itself, the site's full
+ * address on the GitHub Pages copy.
+ */
+function photoSource(ref, slot, base = '') {
+  if (!isPhotoRef(ref, slot)) return null;
+  let set;
+  let size;
+  let large;
+  if (ref.builtin) {
+    const b = BUILTIN_PHOTOS[ref.builtin];
+    set = b.set;
+    size = [b.w, b.h];
+    large = b.large;
+  } else {
+    const spec = PHOTO_SLOTS[slot];
+    set = spec.widths.map((w) => [`${base}/media/${ref.upload}-${w}.jpg`, w]);
+    const w = (set[1] || set[0])[1];
+    size = [w, Math.round(w / spec.ratio)];
+  }
+  const main = set.find(([, w]) => w === size[0]) || set[0];
+  return {
+    src: main[0],
+    srcset: set.map(([u, w]) => `${u} ${w}w`).join(', '),
+    width: size[0],
+    height: size[1],
+    large: large || set.at(-1)[0],
+    byWidth: Object.fromEntries(set.map(([u, w]) => [w, u])),
+  };
+}
+
+/** Upload addresses (for checking that every size of an upload is there). */
+const uploadKeys = (ref, slot) => (ref?.upload ? PHOTO_SLOTS[slot].widths.map((w) => `${ref.upload}-${w}`) : []);
+
+/** Every uploaded photo the content uses, as { id, slot }. */
+function contentUploads(content = {}) {
+  const out = [];
+  const add = (ref, slot) => ref?.upload && out.push({ id: ref.upload, slot });
+  add(content.photos?.hero, 'hero');
+  add(content.photos?.about, 'about');
+  for (const s of Object.values(content.services || {})) add(s?.photo, 'service');
+  for (const g of content.gallery || []) add(g?.photo, 'gallery');
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Putting the content on the page
+// ---------------------------------------------------------------------------
+
+const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+function setPath(obj, path, value) {
+  const keys = path.split('.');
+  const last = keys.pop();
+  const target = keys.reduce((o, k) => (o[k] ??= {}), obj);
+  target[last] = value;
+}
+
+/**
+ * Writes his texts into the Hebrew dictionary (`dict`), and the original text from `pristine`
+ * wherever he has none (so a text he puts back to the original goes back). A section's title
+ * is also its name in the menu, and the headline's two parts make its full text.
+ */
+function applyContentTexts(dict, pristine, texts = {}) {
+  const own = (key) => typeof texts?.[key] === 'string';
+  for (const f of TEXT_FIELDS) {
+    for (const key of [f.text, ...(f.also || [])]) setPath(dict, key, own(f.text) ? texts[f.text] : getPath(pristine, key));
+  }
+  setPath(
+    dict,
+    'hero.title',
+    own('hero.titleA') || own('hero.titleB') ? `${getPath(dict, 'hero.titleA')} ${getPath(dict, 'hero.titleB')}`.trim() : getPath(pristine, 'hero.title'),
+  );
+}
+
+/**
+ * The site's settings (config/site.json, as /api/config gives them) with his treatments and
+ * prices: names, descriptions and photos (`image`, and `imageSet` by width), and the prices.
+ */
+function mergeSiteConfig(config, content = {}, base = '') {
+  const prices = content?.prices;
+  const services = (config.services || []).map((s) => {
+    const mine = content?.services?.[s.id] || {};
+    const photo = photoSource(isPhotoRef(mine.photo, 'service') ? mine.photo : serviceDefaultPhoto(s), 'service', base);
+    return {
+      ...s,
+      name: typeof mine.name === 'string' ? { ...s.name, he: mine.name } : s.name,
+      description: typeof mine.description === 'string' ? { ...s.description, he: mine.description } : s.description,
+      image: photo ? photo.byWidth[700] || photo.src : s.image,
+      imageSet: photo ? photo.byWidth : undefined,
+      price: prices ? prices.session : s.price,
+    };
+  });
+  return {
+    ...config,
+    services,
+    prices: prices
+      ? { ...config.prices, session: { ...config.prices?.session, price: prices.session }, pack: { sessions: prices.packSessions, price: prices.pack } }
+      : config.prices,
+  };
+}
+
+/** The gallery to show: his, or the one that comes with the site. Each: { …photoSource, alt }. */
+function galleryPhotos(content = {}, base = '') {
+  const list = Array.isArray(content?.gallery) ? content.gallery : DEFAULT_GALLERY;
+  return list
+    .map((g) => {
+      const p = photoSource(g?.photo, 'gallery', base);
+      return p && { ...p, alt: typeof g.alt === 'string' ? g.alt : '' };
+    })
+    .filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// Checking what the admin panel sends (the Worker uses these)
+// ---------------------------------------------------------------------------
+
+/**
+ * A text as it will be kept: Unicode-normalized, without control characters or the bidi
+ * overrides that could flip it on screen, single spaces, at most two line breaks in a row
+ * (none for a one-line field). null when it isn't a string.
+ */
+function cleanContentText(value, { multiline = false } = {}) {
+  if (typeof value !== 'string') return null;
+  let s = value.normalize('NFC').replace(/\r\n?/g, '\n').replace(/\t/g, ' ');
+  s = s.replace(/[\u0000-\u0009\u000b-\u001f\u007f\u202a-\u202e]/g, '');
+  if (!multiline) s = s.replace(/\n+/g, ' ');
+  s = s
+    .split('\n')
+    .map((line) => line.replace(/ {2,}/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+}
+
+/** A text's length in characters (code points), the way the limits are counted. */
+const textLength = (s) => [...String(s)].length;
 
 // Date helpers. All booking dates/times are stored as local wall-clock values
 // ("YYYY-MM-DD" + "HH:MM") in the practice's time zone, which keeps slot math
@@ -7244,7 +8555,9 @@ function slotsForDay({ date, duration, schedule, dayBookings = [], blocked = fal
 
 
 // ---- Static backend: everything runs in the browser ----
-const STATIC_CONFIG = {"siteUrl":"https://davidneeman.github.io/Clinic/","googleCalendarUrl":"","business":{"name":{"he":"דוד נאמן","en":"David Neeman"},"tagline":{"he":"יעוץ וטיפול","en":"Consultation & treatment"},"phone":"+972 58-434-4047","whatsapp":"972584344047","email":"","address":{"he":"דרויאנוב 5, תל אביב (בית כלל)","en":"5 Druyanov St., Tel Aviv (Beit Klal)"},"instagram":"","facebook":""},"timezone":"Asia/Jerusalem","currency":"ILS","services":[{"id":"dry-needling","name":{"he":"דיקור מערבי יבש","en":"Western dry needling"},"description":{"he":"שיטה לטיפול בכאבי שרירים או מגבלות תנועה אחרי פציעות או עומס. ע״י אבחון מדויק ונכון של הגוף ואיתור נקודות טריגר מתבצע דיקור במטרה לשחרר ולהתיר את הטריגר פוינטס.","en":"A method for treating muscle pain or limited movement after injuries or overload. Through an accurate assessment of the body and locating trigger points, needling is done to release the trigger points."},"duration":60,"price":350,"icon":"leaf","image":"images/svc-dry.jpg"},{"id":"cosmetic","name":{"he":"דיקור קוסמטי","en":"Cosmetic acupuncture"},"description":{"he":"מטרתו לאזן ולשחרר את שרירי הפנים והצוואר במטרה לשפר את תפקוד השרירים בפנים (הפנים מורכבים מ-43 שרירים שונים) ולעודד מראה בריא, מתוח וחיוני. כמו כן משפר זרימת דם וחמצן לרקמות העור ומסייע בחידוש רקמת העור ויצירה של קולגן ואלסטין.","en":"Its aim is to balance and release the face and neck muscles to improve how the facial muscles work (the face is made of 43 different muscles) and to encourage a healthy, firm and vital look. It also improves blood and oxygen flow to the skin tissue and helps skin renewal and the production of collagen and elastin."},"duration":60,"price":350,"icon":"sparkle","image":"images/svc-cosmetic.jpg"},{"id":"stress","name":{"he":"דיקור סטרס","en":"Acupuncture for stress"},"description":{"he":"משלב טכניקות מהעולם היפני והסיני. נקודות עוצמתיות שמטפלות ברמות קורטיזול גבוהות ובסטרס ותורמות לשלוות נפש ואיזון הורמונלי.","en":"Combines techniques from the Japanese and Chinese traditions. Powerful points that address high cortisol levels and stress and contribute to peace of mind and hormonal balance."},"duration":60,"price":350,"icon":"sun","image":"images/svc-stress.jpg"}],"prices":{"session":{"minutes":60,"price":350},"pack":{"sessions":4,"price":1200}},"defaultSchedule":{"weeklyHours":{"0":[["12:30","19:00"]],"1":[["08:00","14:30"]],"2":[],"3":[["13:00","19:00"]],"4":[["10:00","19:00"]],"5":[],"6":[]},"slotInterval":30,"bufferMinutes":15,"minNoticeHours":0,"maxDaysAhead":30}};
+const STATIC_CONFIG = {"siteUrl":"https://davidneeman.github.io/Clinic/","cloudflareUrl":"https://clinic.davidneeman.workers.dev/","googleCalendarUrl":"","business":{"name":{"he":"דוד נאמן","en":"David Neeman"},"tagline":{"he":"יעוץ וטיפול","en":"Consultation & treatment"},"phone":"+972 58-434-4047","whatsapp":"972584344047","email":"","address":{"he":"דרויאנוב 5, תל אביב (בית כלל)","en":"5 Druyanov St., Tel Aviv (Beit Klal)"},"instagram":"","facebook":""},"timezone":"Asia/Jerusalem","currency":"ILS","services":[{"id":"dry-needling","name":{"he":"דיקור מערבי יבש","en":"Western dry needling"},"description":{"he":"שיטה לטיפול בכאבי שרירים או מגבלות תנועה אחרי פציעות או עומס. ע״י אבחון מדויק ונכון של הגוף ואיתור נקודות טריגר מתבצע דיקור במטרה לשחרר ולהתיר את הטריגר פוינטס.","en":"A method for treating muscle pain or limited movement after injuries or overload. Through an accurate assessment of the body and locating trigger points, needling is done to release the trigger points."},"duration":60,"price":350,"icon":"leaf","image":"images/svc-dry.jpg"},{"id":"cosmetic","name":{"he":"דיקור קוסמטי","en":"Cosmetic acupuncture"},"description":{"he":"מטרתו לאזן ולשחרר את שרירי הפנים והצוואר במטרה לשפר את תפקוד השרירים בפנים (הפנים מורכבים מ-43 שרירים שונים) ולעודד מראה בריא, מתוח וחיוני. כמו כן משפר זרימת דם וחמצן לרקמות העור ומסייע בחידוש רקמת העור ויצירה של קולגן ואלסטין.","en":"Its aim is to balance and release the face and neck muscles to improve how the facial muscles work (the face is made of 43 different muscles) and to encourage a healthy, firm and vital look. It also improves blood and oxygen flow to the skin tissue and helps skin renewal and the production of collagen and elastin."},"duration":60,"price":350,"icon":"sparkle","image":"images/svc-cosmetic.jpg"},{"id":"stress","name":{"he":"דיקור סטרס","en":"Acupuncture for stress"},"description":{"he":"משלב טכניקות מהעולם היפני והסיני. נקודות עוצמתיות שמטפלות ברמות קורטיזול גבוהות ובסטרס ותורמות לשלוות נפש ואיזון הורמונלי.","en":"Combines techniques from the Japanese and Chinese traditions. Powerful points that address high cortisol levels and stress and contribute to peace of mind and hormonal balance."},"duration":60,"price":350,"icon":"sun","image":"images/svc-stress.jpg"}],"prices":{"session":{"minutes":60,"price":350},"pack":{"sessions":4,"price":1200}},"defaultSchedule":{"weeklyHours":{"0":[["12:30","19:00"]],"1":[["08:00","14:30"]],"2":[],"3":[["13:00","19:00"]],"4":[["10:00","19:00"]],"5":[],"6":[]},"slotInterval":30,"bufferMinutes":15,"minNoticeHours":0,"maxDaysAhead":30}};
+// The site on Cloudflare: David's content, notices, opening hours and closed days come from it.
+const REMOTE_ORIGIN = "https://clinic.davidneeman.workers.dev";
 
 // ---- Google Calendar (when connected): googleCalendarUrl in config/site.json is the
 // address of the script in google-calendar/booking-calendar.gs. Times taken in the
@@ -7285,28 +8598,59 @@ function saveToCalendar(request) {
     .finally(() => busyByMonth.clear());
 }
 let staticConfigPromise = null;
+const liveSchedule = () => ({ ...STATIC_CONFIG.defaultSchedule, ...(getSiteData()?.schedule || {}) });
+function staticSiteConfig(data) {
+  const merged = mergeSiteConfig(STATIC_CONFIG, data?.content, REMOTE_ORIGIN);
+  const schedule = liveSchedule();
+  return {
+    business: STATIC_CONFIG.business,
+    services: merged.services,
+    prices: merged.prices,
+    currency: STATIC_CONFIG.currency,
+    timezone: STATIC_CONFIG.timezone,
+    today: nowInZone(STATIC_CONFIG.timezone).date,
+    maxDaysAhead: schedule.maxDaysAhead,
+    hours: schedule.weeklyHours,
+    handoff: 'whatsapp',
+    closedDays: Array.isArray(data?.closed) ? data.closed : [],
+  };
+}
 function loadConfig() {
   staticConfigPromise ??= Promise.resolve().then(() => {
-    siteConfig = {
-      business: STATIC_CONFIG.business,
-      services: STATIC_CONFIG.services,
-      prices: STATIC_CONFIG.prices,
-      currency: STATIC_CONFIG.currency,
-      timezone: STATIC_CONFIG.timezone,
-      today: nowInZone(STATIC_CONFIG.timezone).date,
-      maxDaysAhead: STATIC_CONFIG.defaultSchedule.maxDaysAhead,
-      hours: STATIC_CONFIG.defaultSchedule.weeklyHours,
-      handoff: 'whatsapp',
-    };
+    siteConfig = staticSiteConfig(getSiteData());
     applyTranslations();
     return siteConfig;
   });
   return staticConfigPromise;
 }
+// The latest from the site on Cloudflare, kept for the next visit too. Without an answer, the
+// page stays as it is (as it was on the last visit, or as it comes).
+function refreshSiteData() {
+  if (!REMOTE_ORIGIN) return;
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 8000);
+  fetch(REMOTE_ORIGIN + '/api/site', { signal: stop.signal, credentials: 'omit' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+      try {
+        localStorage.setItem('site-data', JSON.stringify(data));
+      } catch (e) {}
+      if (JSON.stringify(data) === JSON.stringify(getSiteData())) return;
+      setSiteData(data);
+      if (siteConfig) Object.assign(siteConfig, staticSiteConfig(data));
+      applyTranslations();
+      window.__homeRefresh?.();
+      window.__bookRefresh?.();
+    })
+    .catch(() => {})
+    .finally(() => clearTimeout(timer));
+}
 async function api(url) {
   const u = new URL(url, location.href);
   if (u.pathname.endsWith('/api/availability')) {
-    const schedule = STATIC_CONFIG.defaultSchedule;
+    const schedule = liveSchedule();
+    const closed = new Set(getSiteData()?.closed || []);
     const service = STATIC_CONFIG.services.find((s) => s.id === u.searchParams.get('service'));
     const now = nowInZone(STATIC_CONFIG.timezone);
     const last = addDays(now.date, schedule.maxDaysAhead);
@@ -7323,7 +8667,7 @@ async function api(url) {
         duration: service.duration,
         schedule,
         now,
-        blocked: taken === 'all',
+        blocked: taken === 'all' || closed.has(d),
         dayBookings: Array.isArray(taken) ? taken.map(([s, e]) => ({ start: toMinutes(s), end: toMinutes(e) })) : [],
       });
     }
@@ -7354,6 +8698,47 @@ function storageSet(key, value) {
     /* private mode – ignore */
   }
 }
+
+// ---------------------------------------------------------------------------
+// David's content and notices (the admin panel's "האתר" tab). The Worker puts them in the page
+// as a data block (#site-data); his texts replace the dictionary's own before anything is
+// written on the page.
+// ---------------------------------------------------------------------------
+
+/** The Hebrew texts as they come with the site (for "back to the original"). */
+const pristineHebrew = structuredClone(dictionaries.he);
+const siteDataListeners = new Set();
+let siteData = readSiteData();
+
+function readSiteData() {
+  try {
+    const kept = JSON.parse(localStorage.getItem('site-data') || 'null');
+    return kept && typeof kept === 'object' ? kept : null;
+  } catch {
+    return null;
+  }
+}
+
+const getSiteData = () => siteData;
+/** Where his uploaded photos are: this site ('' – the GitHub Pages copy asks the site's address). */
+const mediaBase = () => REMOTE_ORIGIN;
+function onSiteData(fn) {
+  siteDataListeners.add(fn);
+}
+
+/** Newer content (the GitHub Pages copy fetches it after the page opens): show it everywhere. */
+function setSiteData(data) {
+  siteData = data;
+  useSiteTexts();
+  applyTranslations();
+  renderNotices();
+  siteDataListeners.forEach((fn) => fn(data));
+}
+
+function useSiteTexts() {
+  applyContentTexts(dictionaries.he, pristineHebrew, siteData?.content?.texts);
+}
+useSiteTexts();
 
 // ---------------------------------------------------------------------------
 // Language
@@ -7404,7 +8789,12 @@ function setLang(lang) {
  *   data-i18n-attr="placeholder:key;aria-label:key" → attributes
  */
 function applyTranslations(scope = document) {
-  for (const el of scope.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  for (const el of scope.querySelectorAll('[data-i18n]')) {
+    el.textContent = t(el.dataset.i18n);
+    // A paragraph he can leave empty (data-optional) disappears when it is.
+    const box = el.closest('[data-optional]');
+    if (box) box.hidden = !el.textContent.trim();
+  }
   for (const el of scope.querySelectorAll('[data-i18n-attr]')) {
     for (const pair of el.dataset.i18nAttr.split(';')) {
       const [attr, key] = pair.split(':').map((s) => s.trim());
@@ -7559,13 +8949,25 @@ function dayName(day, style = 'long') {
   return new Intl.DateTimeFormat(locale(), { weekday: style, timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + day)));
 }
 
+/** "YYYY-MM-DD" in the clinic's time zone, `offset` days from `at`. */
+function clinicDate(timeZone, at, offset = 0) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  return new Date(Date.parse(`${today}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+}
+
 function clinicStatus(cfg = siteConfig, at = new Date()) {
   if (!cfg?.hours) return null;
   const now = clinicNow(cfg.timezone, at);
-  for (const [from, to] of cfg.hours[now.day] || []) {
-    if (now.minutes >= hhmmToMinutes(from) && now.minutes < hhmmToMinutes(to)) return { open: true, until: to, today: now.day };
+  // Days closed in the admin panel (by hand, or by a notice on the site) aren't open.
+  const closed = new Set(cfg.closedDays || []);
+  const isClosed = (offset) => closed.size > 0 && closed.has(clinicDate(cfg.timezone, at, offset));
+  if (!isClosed(0)) {
+    for (const [from, to] of cfg.hours[now.day] || []) {
+      if (now.minutes >= hhmmToMinutes(from) && now.minutes < hhmmToMinutes(to)) return { open: true, until: to, today: now.day };
+    }
   }
   for (let offset = 0; offset < 8; offset++) {
+    if (isClosed(offset)) continue;
     const day = (now.day + offset) % 7;
     for (const [from] of cfg.hours[day] || []) {
       if (offset > 0 || hhmmToMinutes(from) > now.minutes) return { open: false, day, offset, at: from, today: now.day };
@@ -7591,6 +8993,63 @@ function renderStatus() {
     node.classList.toggle('is-open', s.open);
     node.hidden = !text;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Notices at the top of the site ("the clinic is closed until …"), from the admin panel.
+// A visitor can close a notice or a piece of news (it stays closed for them until it's
+// changed); an alert stays.
+// ---------------------------------------------------------------------------
+
+const NOTICE_ICONS = { info: 'info', news: 'sparkle', alert: 'alert' };
+const noticeKey = (n) => `${n.id}:${n.v}`;
+const closedNotices = () => {
+  try {
+    const list = JSON.parse(storageGet('notices-closed') || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+};
+
+function renderNotices() {
+  document.querySelector('.site-notices')?.remove();
+  const header = document.querySelector('.site-header');
+  if (!header || header.classList.contains('admin-header')) return;
+  const closed = closedNotices();
+  const list = (siteData?.notices || []).filter((n) => n && n.text && (n.kind === 'alert' || !closed.includes(noticeKey(n))));
+  if (!list.length) return;
+  const box = el(
+    'div',
+    { class: 'site-notices', role: 'region', 'aria-label': t('notice.region') },
+    list.map((n) => {
+      const kind = NOTICE_ICONS[n.kind] ? n.kind : 'info';
+      const item = el(
+        'div',
+        { class: `notice notice-${kind}` },
+        el('span', { class: 'notice-icon', 'aria-hidden': 'true', html: svg(NOTICE_ICONS[kind]) }),
+        el('p', { class: 'notice-text' }, kind === 'news' ? el('strong', { class: 'notice-tag' }, t('notice.new')) : '', n.text),
+        kind === 'alert'
+          ? ''
+          : el('button', {
+              type: 'button',
+              class: 'notice-close',
+              'aria-label': t('notice.close'),
+              title: t('notice.close'),
+              html: svg('close'),
+              onclick: () => {
+                storageSet('notices-closed', JSON.stringify([...closed.filter((k) => k.split(':')[0] !== String(n.id)), noticeKey(n)].slice(-20)));
+                const next = item.nextElementSibling || item.previousElementSibling;
+                item.remove();
+                if (!box.querySelector('.notice')) box.remove();
+                (next?.querySelector('.notice-close') || document.getElementById('main'))?.focus?.({ preventScroll: true });
+              },
+            }),
+      );
+      return item;
+    }),
+  );
+  header.before(box);
 }
 
 // ---------------------------------------------------------------------------
@@ -8059,6 +9518,7 @@ function initReveal() {
 }
 
 hydrateIcons();
+renderNotices();
 initHeader();
 initA11yMenu();
 applyTranslations();
@@ -8083,9 +9543,17 @@ let refreshScrollFx = () => {};
 
 const arrow = () => el('span', { class: 'flip-rtl', html: svg('arrow') });
 
-// Each treatment photo also exists in a small and a large copy (scripts/make-images.py),
-// so every screen gets a sharp version without downloading more than it needs.
+// Each treatment photo also exists in a small and a large copy (scripts/make-images.py, or the
+// sizes a photo uploaded in the admin panel is saved in: imageSet), so every screen gets a
+// sharp version without downloading more than it needs.
 const sized = (image, width) => image.replace(/\.jpg$/, `-${width}.jpg`);
+const photoSet = (s) =>
+  s.imageSet
+    ? Object.entries(s.imageSet)
+        .map(([w, url]) => `${url} ${w}w`)
+        .join(', ')
+    : `${s.image} 700w, ${sized(s.image, 1200)} 1200w, ${sized(s.image, 1600)} 1600w`;
+const thumbOf = (s) => s.imageSet?.[300] || sized(s.image, 300);
 
 // ---------------------------------------------------------------------------
 // Treatments: cards that stack as you scroll
@@ -8122,7 +9590,7 @@ function renderServices() {
             ? el('img', {
                 // lazy and the size options first, so the browser fetches only the one it needs
                 loading: 'lazy',
-                srcset: `${s.image} 700w, ${sized(s.image, 1200)} 1200w, ${sized(s.image, 1600)} 1600w`,
+                srcset: photoSet(s),
                 sizes: '(max-width: 860px) 92vw, 50vw',
                 src: s.image,
                 alt: pick(s.name),
@@ -8306,8 +9774,9 @@ function initScrollFx() {
 // Gallery: full-screen viewer
 // ---------------------------------------------------------------------------
 
-function initLightbox(items) {
+function initLightbox(mosaic) {
   let index = 0;
+  let items = [];
   const img = el('img', { alt: '' });
   const counter = el('span');
   const navButton = (icon, labelKey, step) =>
@@ -8335,6 +9804,7 @@ function initLightbox(items) {
   document.body.append(dialog);
 
   function show(i) {
+    items = [...mosaic.querySelectorAll('.mosaic-item')];
     const step = i - index;
     index = (i + items.length) % items.length;
     const item = items[index];
@@ -8354,30 +9824,30 @@ function initLightbox(items) {
     }
   }
 
-  items.forEach((item, i) =>
-    item.addEventListener('click', () => {
-      show(i);
-      dialog.showModal();
-      // The photo grows out of the tile that was tapped.
-      if (reducedMotion() || !img.animate) return;
-      const from = item.getBoundingClientRect();
-      const grow = () => {
-        const to = img.getBoundingClientRect();
-        if (!to.width || !dialog.open) return;
-        const dx = from.left + from.width / 2 - (to.left + to.width / 2);
-        const dy = from.top + from.height / 2 - (to.top + to.height / 2);
-        img.animate(
-          [
-            { transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})`, opacity: 0.4 },
-            { transform: 'none', opacity: 1 },
-          ],
-          { duration: 560, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-        );
-      };
-      if (img.decode) img.decode().then(grow, grow);
-      else grow();
-    }),
-  );
+  mosaic.addEventListener('click', (e) => {
+    const item = e.target.closest('.mosaic-item');
+    if (!item) return;
+    show([...mosaic.querySelectorAll('.mosaic-item')].indexOf(item));
+    dialog.showModal();
+    // The photo grows out of the tile that was tapped.
+    if (reducedMotion() || !img.animate) return;
+    const from = item.getBoundingClientRect();
+    const grow = () => {
+      const to = img.getBoundingClientRect();
+      if (!to.width || !dialog.open) return;
+      const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      img.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})`, opacity: 0.4 },
+          { transform: 'none', opacity: 1 },
+        ],
+        { duration: 560, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      );
+    };
+    if (img.decode) img.decode().then(grow, grow);
+    else grow();
+  });
   dialog.addEventListener('click', (e) => e.target === dialog && dialog.close());
   dialog.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') show(index + (isRtl() ? 1 : -1));
@@ -8501,7 +9971,7 @@ function renderHeroTreatments() {
           { href: `#svc-${s.id}` },
           el('span', { class: 'ht-num', 'aria-hidden': 'true' }, `0${i + 1}`),
           s.image
-            ? el('img', { srcset: `${sized(s.image, 300)} 300w, ${s.image} 700w`, sizes: '84px', src: sized(s.image, 300), alt: '', width: 76, height: 76 })
+            ? el('img', { srcset: `${thumbOf(s)} 300w, ${s.image} 700w`, sizes: '84px', src: thumbOf(s), alt: '', width: 76, height: 76 })
             : null,
           el('span', { class: 'ht-name' }, pick(s.name)),
           el('span', { class: 'ht-go flip-rtl', 'aria-hidden': 'true', html: svg('arrow') }),
@@ -8798,8 +10268,62 @@ window.addEventListener('load', () => {
   }, 2500);
 });
 
-const galleryItems = [...document.querySelectorAll('.mosaic-item')];
-if (galleryItems.length) initLightbox(galleryItems);
+// ---------------------------------------------------------------------------
+// His photos and gallery (the admin panel's "האתר" tab). On the site itself the Worker has
+// already put the opening and "about" photos in the page; this writes them again only when
+// they differ (the GitHub Pages copy, or newer content).
+// ---------------------------------------------------------------------------
+
+function renderPhotos() {
+  const content = getSiteData()?.content || {};
+  for (const img of document.querySelectorAll('img[data-photo]')) {
+    const slot = img.dataset.photo;
+    // (while choosing the opening photo with ?photo, the chooser decides)
+    if (slot === 'hero' && document.querySelector('.photo-chooser')) continue;
+    const photo = photoSource(content.photos?.[slot] || DEFAULT_PHOTOS[slot], slot, mediaBase());
+    if (photo && img.getAttribute('srcset') !== photo.srcset) {
+      img.srcset = photo.srcset;
+      img.src = photo.src;
+      img.width = photo.width;
+      img.height = photo.height;
+    }
+    if (slot === 'about') img.alt = typeof content.aboutAlt === 'string' ? content.aboutAlt : DEFAULT_ABOUT_ALT;
+  }
+}
+
+function renderGallery() {
+  const mosaic = $('mosaic');
+  const content = getSiteData()?.content;
+  // As it comes with the site: the photos already in the page.
+  if (!mosaic || (!Array.isArray(content?.gallery) && !mosaic.dataset.custom)) return;
+  const photos = galleryPhotos(content, mediaBase());
+  const cols = [...mosaic.querySelectorAll('.mosaic-col')];
+  // In order, column by column, as evenly as they go.
+  let at = 0;
+  cols.forEach((col, c) => {
+    const n = Math.floor(photos.length / cols.length) + (c < photos.length % cols.length ? 1 : 0);
+    col.replaceChildren(
+      ...photos.slice(at, at + n).map((p) =>
+        el(
+          'button',
+          { type: 'button', class: 'mosaic-item', 'data-large': p.large },
+          el('img', { src: p.src, srcset: p.srcset, sizes: '(max-width: 760px) 76vw, 34vw', alt: p.alt, width: p.width, height: p.height, loading: 'lazy' }),
+        ),
+      ),
+    );
+    at += n;
+  });
+  mosaic.dataset.custom = '1';
+}
+
+renderPhotos();
+renderGallery();
+onSiteData(() => {
+  renderPhotos();
+  renderGallery();
+  renderWords();
+});
+if ($('mosaic')) initLightbox($('mosaic'));
 renderWords();
 initScrollFx();
 initActionBar();
@@ -8833,37 +10357,40 @@ setInterval(renderHours, 60_000);
 // one is chosen.
 // ---------------------------------------------------------------------------
 
-const PHOTOS = [
-  ['room', 'עכשיו'],
-  ['david-1', '1'],
-  ['david-2', '2'],
-  ['david-3', '3'],
-];
-
 function initPhotoChooser() {
   const asked = /[?&]photo(?:=(\d))?(?:&|$)/.exec(location.search);
   const img = document.querySelector('.hero-room img');
   if (!asked || !img) return;
-  const buttons = PHOTOS.map(([id, label]) =>
-    el('button', { type: 'button', 'data-photo': id }, el('img', { src: `images/${id}-640.jpg`, alt: '' }), el('span', {}, label)),
+  // "עכשיו": the photo on the site now (as set in the admin panel), then David's three.
+  const now = getSiteData()?.content?.photos?.hero || DEFAULT_PHOTOS.hero;
+  const photos = [['now', 'עכשיו', now], ...['david-1', 'david-2', 'david-3'].map((id, i) => [id, String(i + 1), { builtin: id }])].map(
+    ([id, label, ref]) => [id, label, photoSource(ref, 'hero', mediaBase())],
+  );
+  const buttons = photos.map(([id, label, photo]) =>
+    el('button', { type: 'button', 'data-choice': id }, el('img', { src: photo.byWidth[640] || photo.src, alt: '' }), el('span', {}, label)),
   );
   const show = (id, scroll) => {
-    img.srcset = `images/${id}-640.jpg 640w, images/${id}.jpg 960w, images/${id}-1440.jpg 1440w`;
-    img.src = `images/${id}.jpg`;
-    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.photo === id));
+    const photo = photos.find(([p]) => p === id)[2];
+    img.srcset = photo.srcset;
+    img.src = photo.src;
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.choice === id));
     // On phones the arch is below the opening buttons: bring it into view.
     if (scroll) img.closest('.hero-room').scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const bar = el('div', { class: 'photo-chooser', role: 'group', 'aria-label': 'בחירת תמונה' }, ...buttons);
   bar.addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (b) show(b.dataset.photo, true);
+    if (b) show(b.dataset.choice, true);
   });
   document.body.append(bar);
-  show((PHOTOS[Number(asked[1])] || PHOTOS[1])[0], false);
+  show((photos[Number(asked[1])] || photos[1])[0], false);
 }
 
 initPhotoChooser();
+
+window.__homeRefresh = () => {
+  if (config) renderAll();
+};
 
 }
 {
@@ -9485,6 +11012,9 @@ loadConfig()
     $('service-options').replaceChildren(el('p', { class: 'alert alert-error' }, t('common.error')));
   });
 
+window.__bookRefresh = () => {
+  if (state.config) renderAll();
+};
 window.__bookPreset = (id) => {
   const s = state.config?.services.find((x) => x.id === id);
   if (s) {
@@ -9568,6 +11098,7 @@ window.__bookReset = () => {
   route();
 }
 
+refreshSiteData();
   </script>
 </body>
 </html>

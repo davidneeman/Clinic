@@ -5850,3 +5850,805 @@ html.js .reveal:not(.is-visible) {
   font-weight: 600;
   box-shadow: var(--shadow);
 }
+
+/* ==========================================================================
+   Notices at the top of the site (written in the admin panel's "האתר" tab)
+   ========================================================================== */
+
+.site-notices {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) var(--gutter) 0;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding: 11px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.55;
+  animation: notice-in 0.6s var(--ease) both;
+}
+
+.notice-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.notice-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.notice-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice-tag {
+  display: inline-block;
+  margin-inline-end: 8px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.75;
+  vertical-align: 1px;
+}
+
+.notice-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-block: -10px;
+  margin-inline: -4px -10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.notice-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.notice-close:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.notice-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+
+.notice-news {
+  background: color-mix(in srgb, var(--accent-soft) 65%, var(--surface));
+}
+
+.notice-alert {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.notice-alert .notice-icon {
+  color: var(--on-accent);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Texts written in the admin panel keep their line breaks. */
+.about-text p,
+.section-lead,
+.stack-desc,
+.prep li > span:last-child {
+  white-space: pre-line;
+}
+
+/* ==========================================================================
+   Admin panel: the "האתר" tab – notices, then the site's texts, prices and photos
+   ========================================================================== */
+
+.site-part + .site-part {
+  margin-top: 44px;
+}
+
+.site-part-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+
+.site-part-head .subhead {
+  margin-top: 0;
+}
+
+.site-part-head .panel-sub {
+  max-width: 62ch;
+  margin: 0;
+}
+
+.notice-preview {
+  animation: none;
+}
+
+.notice-item .item-body {
+  display: grid;
+  gap: 10px;
+}
+
+.notice-item:is(.is-paused, .is-ended) .notice-preview {
+  opacity: 0.55;
+}
+
+.notice-status {
+  margin: 0;
+}
+
+.notice-chip-live {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.notice-item .notice-closing {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.notice-form {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.notice-form .subhead {
+  margin: 0;
+}
+
+.kind-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.kind-options legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 0.94rem;
+  font-weight: 500;
+}
+
+.kind-option {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* (the real radio button lies over its whole card, so it's what a tap or a screen reader finds) */
+.kind-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.kind-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.kind-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.kind-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+}
+
+.kind-text {
+  display: grid;
+  line-height: 1.35;
+}
+
+.kind-text small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 460px) {
+  .kind-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kind-option {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 14px;
+    text-align: start;
+  }
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.minihead {
+  margin: 4px 0 -8px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.close-days {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.close-days .field-hint {
+  margin: 0;
+}
+
+.char-count {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The site's content: one folding part per section of the home page */
+.edit-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.edit-section + .edit-section {
+  margin-top: 10px;
+}
+
+.edit-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  list-style: none;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.edit-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.edit-section > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.edit-section-name {
+  flex: 1;
+}
+
+.edit-chevron {
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+  transition: transform 0.3s var(--ease);
+}
+
+.edit-section[open] .edit-chevron {
+  transform: rotate(180deg);
+}
+
+.edit-body {
+  display: grid;
+  gap: 24px;
+  padding: 6px 18px 22px;
+}
+
+.edit-field textarea {
+  min-height: 96px;
+  overflow-y: auto;
+}
+
+.field-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.field-foot .char-count {
+  margin-inline-start: auto;
+}
+
+.edit-body .field-hint {
+  margin: 0;
+}
+
+.photo-group {
+  display: grid;
+  gap: 14px;
+}
+
+.photo-field {
+  display: grid;
+  gap: 10px;
+}
+
+.photo-field.has-error .photo-frame {
+  outline: 2px solid var(--danger);
+  outline-offset: 3px;
+}
+
+.photo-label {
+  margin: 0;
+  font-size: 0.94rem;
+  font-weight: 500;
+}
+
+.photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.photo-frame {
+  position: relative;
+  flex: none;
+  width: 120px;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--photo-bg);
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-frame-hero,
+.crop-frame-hero {
+  border-radius: 999px 999px 0 0;
+}
+
+.photo-frame-service {
+  aspect-ratio: 1;
+}
+
+.photo-fan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.photo-actions {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.photo-actions .btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.builtin-list {
+  display: flex;
+  gap: 10px;
+  padding: 4px 2px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+
+.builtin-photo {
+  flex: none;
+  display: grid;
+  gap: 6px;
+  width: 86px;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: center;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.builtin-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 999px 999px 4px 4px;
+}
+
+.builtin-photo[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.builtin-photo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.service-edit-list {
+  display: grid;
+  gap: 16px;
+}
+
+.service-edit {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.service-edit legend {
+  padding: 0 8px;
+  font-weight: 600;
+}
+
+.form-row-3 {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.gallery-edit {
+  display: grid;
+  gap: 12px;
+}
+
+.gallery-rows {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gallery-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-areas:
+    'thumb actions'
+    'field field';
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.gallery-thumb {
+  grid-area: thumb;
+  width: 72px;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 10px;
+  background: var(--photo-bg);
+}
+
+.gallery-row .field {
+  grid-area: field;
+}
+
+.gallery-row-actions {
+  grid-area: actions;
+}
+
+/* Wide screens: the photo, its description and the buttons on one line */
+@media (min-width: 760px) {
+  .gallery-row {
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    grid-template-areas: 'thumb field actions';
+  }
+}
+
+.gallery-row .field label {
+  font-size: 0.85rem;
+}
+
+.gallery-row .field input {
+  min-height: 46px;
+  padding-block: 8px;
+}
+
+.gallery-row-actions {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.gallery-row-actions .icon-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* While there are changes to save: a bar that stays at the bottom of the screen */
+.save-bar {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  margin-top: 24px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--header-bg);
+  box-shadow: var(--shadow-lift);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
+.save-bar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-bar-text {
+  flex: 1 1 140px;
+  font-weight: 600;
+}
+
+#save-alert:empty {
+  display: none;
+}
+
+#save-alert .alert {
+  margin-top: 8px;
+}
+
+/* Framing a photo before it's uploaded: the frame takes whatever room the screen leaves, and
+   the buttons always show (on a phone the dialog fills the screen) */
+.crop-dialog {
+  width: min(560px, calc(100vw - 32px));
+  height: min(860px, calc(100dvh - 32px));
+  max-width: none;
+  max-height: none;
+}
+
+.crop-dialog .dialog-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 20px;
+}
+
+.crop-dialog h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.crop-dialog .panel-sub {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.crop-dialog .panel-actions {
+  margin: 0;
+}
+
+.crop-stage {
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+}
+
+@media (max-width: 560px) {
+  .crop-dialog {
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    border: 0;
+  }
+
+  .crop-dialog .dialog-inner {
+    padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.crop-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--photo-bg);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.crop-frame.crop-frame-hero {
+  border-radius: 999px 999px 0 0;
+}
+
+.crop-frame:active {
+  cursor: grabbing;
+}
+
+.crop-frame:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* The arch's window in the editor: drawn at once, without the home page's entrance */
+.photo-fan .fanlight path {
+  animation: none !important;
+  stroke-dasharray: none;
+}
+
+.crop-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.crop-zoom input {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+.crop-zoom input:focus {
+  box-shadow: none;
+}
+
+.crop-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Admin forms never grow wider than the screen: a field as wide as its content (a date and
+   time field is) shrinks to the column instead of pushing the form out. */
+.admin-wrap :is(.form, .edit-body, .service-edit, .photo-group, .photo-field, .gallery-edit, .close-days, .field) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Phones: the admin tabs in rows of three, all of them in sight */
+@media (max-width: 560px) {
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    border-radius: 24px;
+  }
+
+  .tab {
+    padding: 9px 4px;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+}
+
+/* Phones: each day's opening hours fit the width (two time fields and the remove button) */
+@media (max-width: 560px) {
+  .ranges {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .range {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .range input {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .range .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* A notice shown in the admin list keeps the site's colors (not the list's grey text) */
+.item-body .notice-text {
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Red text (remove buttons, errors) dark enough to read on the light background (4.5:1) */
+:root[data-look='2ln']:not([data-theme='dark']) {
+  --danger: #9a3a2c;
+}

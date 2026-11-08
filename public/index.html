@@ -73,7 +73,7 @@
           <ul class="hero-treatments" id="hero-treatments" data-i18n-attr="aria-label:nav.treatments"></ul>
         </div>
         <figure class="hero-room" aria-hidden="true" data-parallax="18">
-          <img src="images/room.jpg" srcset="images/room-640.jpg 640w, images/room.jpg 960w, images/room-1440.jpg 1440w" sizes="(max-width: 900px) 92vw, 46vw" alt="" width="960" height="1200" loading="lazy">
+          <img data-photo="hero" src="images/room.jpg" srcset="images/room-640.jpg 640w, images/room.jpg 960w, images/room-1440.jpg 1440w" sizes="(max-width: 900px) 92vw, 46vw" alt="" width="960" height="1200" loading="lazy">
           <svg class="fanlight" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path pathLength="1" d="M100 100H0"></path><path pathLength="1" d="M100 100H200"></path><path pathLength="1" d="M124 100A24 24 0 0 0 76 100"></path><path pathLength="1" d="M122.17 90.82L192.39 61.73"></path><path pathLength="1" d="M116.97 83.03L170.71 29.29"></path><path pathLength="1" d="M109.18 77.83L138.27 7.61"></path><path pathLength="1" d="M100 76L100 0"></path><path pathLength="1" d="M90.82 77.83L61.73 7.61"></path><path pathLength="1" d="M83.03 83.03L29.29 29.29"></path><path pathLength="1" d="M77.83 90.82L7.61 61.73"></path></svg>
         </figure>
       </div>
@@ -87,7 +87,7 @@
             <span class="sec-num" aria-hidden="true">01</span>
             <h2 class="section-title" data-i18n="treatments.title"></h2>
           </div>
-          <p class="section-lead" data-i18n="treatments.lead"></p>
+          <p class="section-lead" data-i18n="treatments.lead" data-optional></p>
         </header>
         <ol class="stack" id="services-list" aria-live="polite"></ol>
         <!-- Prices: a session, and a card of sessions (config/site.json → prices) -->
@@ -134,15 +134,15 @@
         <div class="about">
           <figure class="about-photo reveal" data-parallax="16">
             <div class="blob">
-              <img src="images/about.jpg" srcset="images/about.jpg 900w, images/about-1350.jpg 1350w, images/about-1800.jpg 1800w" sizes="(max-width: 900px) 92vw, 45vw" alt="דוד נאמן בקליניקה" width="900" height="1125" loading="lazy">
+              <img data-photo="about" src="images/about.jpg" srcset="images/about.jpg 900w, images/about-1350.jpg 1350w, images/about-1800.jpg 1800w" sizes="(max-width: 900px) 92vw, 45vw" alt="דוד נאמן בקליניקה" width="900" height="1125" loading="lazy">
             </div>
           </figure>
           <div class="about-text reveal">
             <span class="sec-num" aria-hidden="true">03</span>
             <h2 class="section-title" data-i18n="about.title"></h2>
             <p class="about-lead" data-i18n="about.p1"></p>
-            <p data-i18n="about.p2"></p>
-            <p data-i18n="about.p3"></p>
+            <p data-i18n="about.p2" data-optional></p>
+            <p data-i18n="about.p3" data-optional></p>
           </div>
         </div>
         <figure class="statement">
@@ -188,8 +188,8 @@
             <h3 class="visit-h"><span data-icon="leaf"></span><span data-i18n="visit.prep"></span></h3>
             <ul class="prep">
               <li><span class="prep-icon" data-icon="clock"></span><span data-i18n="visit.prep1"></span></li>
-              <li><span class="prep-icon" data-icon="shirt"></span><span data-i18n="visit.prep2"></span></li>
-              <li><span class="prep-icon" data-icon="calendarX"></span><span data-i18n="visit.prep3"></span></li>
+              <li data-optional><span class="prep-icon" data-icon="shirt"></span><span data-i18n="visit.prep2"></span></li>
+              <li data-optional><span class="prep-icon" data-icon="calendarX"></span><span data-i18n="visit.prep3"></span></li>
             </ul>
           </div>
         </div>

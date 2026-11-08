@@ -6,13 +6,17 @@ import {
   el,
   formatPrice,
   getLang,
+  getSiteData,
   loadConfig,
+  mediaBase,
   onLangChange,
+  onSiteData,
   pick,
   showFieldErrors,
   t,
 } from './site.js';
 import { svg } from './icons.js';
+import { DEFAULT_ABOUT_ALT, DEFAULT_PHOTOS, galleryPhotos, photoSource } from './site-content.js';
 
 const $ = (id) => document.getElementById(id);
 const bookHref = (id) => `/book?service=${encodeURIComponent(id)}`;
@@ -25,9 +29,17 @@ let refreshScrollFx = () => {};
 
 const arrow = () => el('span', { class: 'flip-rtl', html: svg('arrow') });
 
-// Each treatment photo also exists in a small and a large copy (scripts/make-images.py),
-// so every screen gets a sharp version without downloading more than it needs.
+// Each treatment photo also exists in a small and a large copy (scripts/make-images.py, or the
+// sizes a photo uploaded in the admin panel is saved in: imageSet), so every screen gets a
+// sharp version without downloading more than it needs.
 const sized = (image, width) => image.replace(/\.jpg$/, `-${width}.jpg`);
+const photoSet = (s) =>
+  s.imageSet
+    ? Object.entries(s.imageSet)
+        .map(([w, url]) => `${url} ${w}w`)
+        .join(', ')
+    : `${s.image} 700w, ${sized(s.image, 1200)} 1200w, ${sized(s.image, 1600)} 1600w`;
+const thumbOf = (s) => s.imageSet?.[300] || sized(s.image, 300);
 
 // ---------------------------------------------------------------------------
 // Treatments: cards that stack as you scroll
@@ -64,7 +76,7 @@ function renderServices() {
             ? el('img', {
                 // lazy and the size options first, so the browser fetches only the one it needs
                 loading: 'lazy',
-                srcset: `${s.image} 700w, ${sized(s.image, 1200)} 1200w, ${sized(s.image, 1600)} 1600w`,
+                srcset: photoSet(s),
                 sizes: '(max-width: 860px) 92vw, 50vw',
                 src: s.image,
                 alt: pick(s.name),
@@ -248,8 +260,9 @@ function initScrollFx() {
 // Gallery: full-screen viewer
 // ---------------------------------------------------------------------------
 
-function initLightbox(items) {
+function initLightbox(mosaic) {
   let index = 0;
+  let items = [];
   const img = el('img', { alt: '' });
   const counter = el('span');
   const navButton = (icon, labelKey, step) =>
@@ -277,6 +290,7 @@ function initLightbox(items) {
   document.body.append(dialog);
 
   function show(i) {
+    items = [...mosaic.querySelectorAll('.mosaic-item')];
     const step = i - index;
     index = (i + items.length) % items.length;
     const item = items[index];
@@ -296,30 +310,30 @@ function initLightbox(items) {
     }
   }
 
-  items.forEach((item, i) =>
-    item.addEventListener('click', () => {
-      show(i);
-      dialog.showModal();
-      // The photo grows out of the tile that was tapped.
-      if (reducedMotion() || !img.animate) return;
-      const from = item.getBoundingClientRect();
-      const grow = () => {
-        const to = img.getBoundingClientRect();
-        if (!to.width || !dialog.open) return;
-        const dx = from.left + from.width / 2 - (to.left + to.width / 2);
-        const dy = from.top + from.height / 2 - (to.top + to.height / 2);
-        img.animate(
-          [
-            { transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})`, opacity: 0.4 },
-            { transform: 'none', opacity: 1 },
-          ],
-          { duration: 560, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-        );
-      };
-      if (img.decode) img.decode().then(grow, grow);
-      else grow();
-    }),
-  );
+  mosaic.addEventListener('click', (e) => {
+    const item = e.target.closest('.mosaic-item');
+    if (!item) return;
+    show([...mosaic.querySelectorAll('.mosaic-item')].indexOf(item));
+    dialog.showModal();
+    // The photo grows out of the tile that was tapped.
+    if (reducedMotion() || !img.animate) return;
+    const from = item.getBoundingClientRect();
+    const grow = () => {
+      const to = img.getBoundingClientRect();
+      if (!to.width || !dialog.open) return;
+      const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      img.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})`, opacity: 0.4 },
+          { transform: 'none', opacity: 1 },
+        ],
+        { duration: 560, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      );
+    };
+    if (img.decode) img.decode().then(grow, grow);
+    else grow();
+  });
   dialog.addEventListener('click', (e) => e.target === dialog && dialog.close());
   dialog.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') show(index + (isRtl() ? 1 : -1));
@@ -443,7 +457,7 @@ function renderHeroTreatments() {
           { href: `#svc-${s.id}` },
           el('span', { class: 'ht-num', 'aria-hidden': 'true' }, `0${i + 1}`),
           s.image
-            ? el('img', { srcset: `${sized(s.image, 300)} 300w, ${s.image} 700w`, sizes: '84px', src: sized(s.image, 300), alt: '', width: 76, height: 76 })
+            ? el('img', { srcset: `${thumbOf(s)} 300w, ${s.image} 700w`, sizes: '84px', src: thumbOf(s), alt: '', width: 76, height: 76 })
             : null,
           el('span', { class: 'ht-name' }, pick(s.name)),
           el('span', { class: 'ht-go flip-rtl', 'aria-hidden': 'true', html: svg('arrow') }),
@@ -740,8 +754,62 @@ window.addEventListener('load', () => {
   }, 2500);
 });
 
-const galleryItems = [...document.querySelectorAll('.mosaic-item')];
-if (galleryItems.length) initLightbox(galleryItems);
+// ---------------------------------------------------------------------------
+// His photos and gallery (the admin panel's "האתר" tab). On the site itself the Worker has
+// already put the opening and "about" photos in the page; this writes them again only when
+// they differ (the GitHub Pages copy, or newer content).
+// ---------------------------------------------------------------------------
+
+function renderPhotos() {
+  const content = getSiteData()?.content || {};
+  for (const img of document.querySelectorAll('img[data-photo]')) {
+    const slot = img.dataset.photo;
+    // (while choosing the opening photo with ?photo, the chooser decides)
+    if (slot === 'hero' && document.querySelector('.photo-chooser')) continue;
+    const photo = photoSource(content.photos?.[slot] || DEFAULT_PHOTOS[slot], slot, mediaBase());
+    if (photo && img.getAttribute('srcset') !== photo.srcset) {
+      img.srcset = photo.srcset;
+      img.src = photo.src;
+      img.width = photo.width;
+      img.height = photo.height;
+    }
+    if (slot === 'about') img.alt = typeof content.aboutAlt === 'string' ? content.aboutAlt : DEFAULT_ABOUT_ALT;
+  }
+}
+
+function renderGallery() {
+  const mosaic = $('mosaic');
+  const content = getSiteData()?.content;
+  // As it comes with the site: the photos already in the page.
+  if (!mosaic || (!Array.isArray(content?.gallery) && !mosaic.dataset.custom)) return;
+  const photos = galleryPhotos(content, mediaBase());
+  const cols = [...mosaic.querySelectorAll('.mosaic-col')];
+  // In order, column by column, as evenly as they go.
+  let at = 0;
+  cols.forEach((col, c) => {
+    const n = Math.floor(photos.length / cols.length) + (c < photos.length % cols.length ? 1 : 0);
+    col.replaceChildren(
+      ...photos.slice(at, at + n).map((p) =>
+        el(
+          'button',
+          { type: 'button', class: 'mosaic-item', 'data-large': p.large },
+          el('img', { src: p.src, srcset: p.srcset, sizes: '(max-width: 760px) 76vw, 34vw', alt: p.alt, width: p.width, height: p.height, loading: 'lazy' }),
+        ),
+      ),
+    );
+    at += n;
+  });
+  mosaic.dataset.custom = '1';
+}
+
+renderPhotos();
+renderGallery();
+onSiteData(() => {
+  renderPhotos();
+  renderGallery();
+  renderWords();
+});
+if ($('mosaic')) initLightbox($('mosaic'));
 renderWords();
 initScrollFx();
 initActionBar();
@@ -775,34 +843,33 @@ setInterval(renderHours, 60_000);
 // one is chosen.
 // ---------------------------------------------------------------------------
 
-const PHOTOS = [
-  ['room', 'עכשיו'],
-  ['david-1', '1'],
-  ['david-2', '2'],
-  ['david-3', '3'],
-];
-
 function initPhotoChooser() {
   const asked = /[?&]photo(?:=(\d))?(?:&|$)/.exec(location.search);
   const img = document.querySelector('.hero-room img');
   if (!asked || !img) return;
-  const buttons = PHOTOS.map(([id, label]) =>
-    el('button', { type: 'button', 'data-photo': id }, el('img', { src: `images/${id}-640.jpg`, alt: '' }), el('span', {}, label)),
+  // "עכשיו": the photo on the site now (as set in the admin panel), then David's three.
+  const now = getSiteData()?.content?.photos?.hero || DEFAULT_PHOTOS.hero;
+  const photos = [['now', 'עכשיו', now], ...['david-1', 'david-2', 'david-3'].map((id, i) => [id, String(i + 1), { builtin: id }])].map(
+    ([id, label, ref]) => [id, label, photoSource(ref, 'hero', mediaBase())],
+  );
+  const buttons = photos.map(([id, label, photo]) =>
+    el('button', { type: 'button', 'data-choice': id }, el('img', { src: photo.byWidth[640] || photo.src, alt: '' }), el('span', {}, label)),
   );
   const show = (id, scroll) => {
-    img.srcset = `images/${id}-640.jpg 640w, images/${id}.jpg 960w, images/${id}-1440.jpg 1440w`;
-    img.src = `images/${id}.jpg`;
-    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.photo === id));
+    const photo = photos.find(([p]) => p === id)[2];
+    img.srcset = photo.srcset;
+    img.src = photo.src;
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.choice === id));
     // On phones the arch is below the opening buttons: bring it into view.
     if (scroll) img.closest('.hero-room').scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const bar = el('div', { class: 'photo-chooser', role: 'group', 'aria-label': 'בחירת תמונה' }, ...buttons);
   bar.addEventListener('click', (e) => {
     const b = e.target.closest('button');
-    if (b) show(b.dataset.photo, true);
+    if (b) show(b.dataset.choice, true);
   });
   document.body.append(bar);
-  show((PHOTOS[Number(asked[1])] || PHOTOS[1])[0], false);
+  show((photos[Number(asked[1])] || photos[1])[0], false);
 }
 
 initPhotoChooser();

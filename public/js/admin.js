@@ -1,5 +1,6 @@
 import { api, clearFieldErrors, el, loadConfig, locale, onLangChange, pick, showFieldErrors, t, toast } from './site.js';
 import { svg } from './icons.js';
+import { createSiteTab } from './admin-site.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,7 +22,16 @@ const state = {
   clientQuery: '',
   people: [],
   me: null,
+  // The "האתר" tab (on Cloudflare): notices, texts, prices and photos.
+  editor: false,
 };
+
+const siteTab = createSiteTab({
+  getConfig: () => state.config,
+  onUnauthorized: () => showLogin(),
+  // A notice can close the calendar on some days: show them in the schedule tab too.
+  onClosedDaysChanged: () => loadSchedule().catch(() => {}),
+});
 
 function fmtDate(dateStr, opts = { weekday: 'short', day: 'numeric', month: 'short' }) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -92,7 +102,14 @@ async function showDashboard() {
   $('dashboard').hidden = false;
   $('tab-clients').hidden = !state.passkeys;
   $('tab-people').hidden = !state.passkeys;
-  await Promise.all([loadBookings(), loadSchedule(), loadMessages(), ...(state.passkeys ? [loadClients(), loadPeople()] : [])]);
+  $('tab-site').hidden = !state.editor;
+  await Promise.all([
+    loadBookings(),
+    loadSchedule(),
+    loadMessages(),
+    ...(state.passkeys ? [loadClients(), loadPeople()] : []),
+    ...(state.editor ? [siteTab.load().catch(() => {})] : []),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,19 +542,22 @@ function renderBlocked() {
         'div',
         { class: 'item' },
         el('div', { class: 'item-when' }, el('small', {}, fmtDate(b.date, { weekday: 'long' })), el('strong', {}, fmtDate(b.date, { day: 'numeric', month: 'short' }))),
-        el('div', { class: 'item-body' }, el('p', {}, b.note || '')),
+        el('div', { class: 'item-body' }, el('p', {}, b.note || ''), b.notice_id ? el('p', { class: 'field-hint' }, t('admin.closedByNotice')) : ''),
         el(
           'div',
           { class: 'item-actions' },
-          el('button', {
-            type: 'button',
-            class: 'btn btn-danger btn-sm',
-            onclick: async () => {
-              const data = await guarded(() => api(`/api/admin/blocked/${b.date}`, { method: 'DELETE', body: {} }));
-              state.blocked = data.blocked;
-              renderBlocked();
-            },
-          }, t('admin.remove')),
+          // A day a notice closed opens again with the notice (the "האתר" tab), not here.
+          b.notice_id
+            ? ''
+            : el('button', {
+                type: 'button',
+                class: 'btn btn-danger btn-sm',
+                onclick: async () => {
+                  const data = await guarded(() => api(`/api/admin/blocked/${b.date}`, { method: 'DELETE', body: {} }));
+                  state.blocked = data.blocked;
+                  renderBlocked();
+                },
+              }, t('admin.remove')),
         ),
       ),
     ),
@@ -887,12 +907,14 @@ onLangChange(() => {
   if (state.schedule) renderHours();
   renderBlocked();
   renderMessages();
+  siteTab.render();
 });
 
 Promise.all([loadConfig().catch(() => null), api('/api/admin/session')])
-  .then(([cfg, { enabled, loggedIn, access, passkeys }]) => {
+  .then(([cfg, { enabled, loggedIn, access, passkeys, editor }]) => {
     state.config = cfg;
     state.passkeys = Boolean(passkeys);
+    state.editor = Boolean(editor);
     state.access = Boolean(access) && !state.passkeys;
     state.enabled = Boolean(enabled);
     $('admin-disabled').hidden = enabled;

@@ -3,6 +3,9 @@
 // There is no server on GitHub Pages, so:
 //   - free times are calculated in the browser from the opening hours in config/site.json
 //   - booking requests and contact messages are sent to the practitioner on WhatsApp
+//   - what David changes in the admin panel (texts, photos, prices, notices, opening hours,
+//     closed days) is read from the site on Cloudflare (config/site.json → cloudflareUrl,
+//     its /api/site) and kept in the browser, so this copy looks the same
 //
 // Usage: npm run build:pages            (writes docs/)
 //        node scripts/build-pages.mjs <out-dir>
@@ -79,8 +82,20 @@ for (const s of config.services) {
 let site = read('public/js/site.js');
 site = replaceOnce(site, 'export function loadConfig()', 'function serverLoadConfig()');
 site = replaceOnce(site, 'export async function api(', 'async function serverApi(');
+// His content: kept in the browser from the last visit, then fetched fresh (refreshSiteData).
+site = replaceOnce(
+  site,
+  "  const node = document.getElementById('site-data');\n  if (!node) return null;\n  try {\n    return JSON.parse(node.textContent);\n  } catch {\n    return null;\n  }",
+  "  try {\n    const kept = JSON.parse(localStorage.getItem('site-data') || 'null');\n    return kept && typeof kept === 'object' ? kept : null;\n  } catch {\n    return null;\n  }",
+);
+site = replaceOnce(site, "export const mediaBase = () => '';", 'const mediaBase = () => REMOTE_ORIGIN;');
 
 let home = stripModule(read('public/js/home.js'));
+home += `
+window.__homeRefresh = () => {
+  if (config) renderAll();
+};
+`;
 // Booking links point at the #book page; the router reads data-service to preselect a treatment.
 home = replaceOnce(home, 'const bookHref = (id) => `/book?service=${encodeURIComponent(id)}`;', "const bookHref = () => '#book';");
 
@@ -93,6 +108,9 @@ bookJs = replaceOnce(
   "  window.open(href, '_blank', 'noopener');\n  saveToCalendar({ date: state.date, time: state.time, duration: state.service.duration, service: pick(state.service.name), name: data.name.trim(), notes: (data.notes || '').trim() })?.finally(() => cache.clear());\n",
 );
 bookJs += `
+window.__bookRefresh = () => {
+  if (state.config) renderAll();
+};
 window.__bookPreset = (id) => {
   const s = state.config?.services.find((x) => x.id === id);
   if (s) {
@@ -115,9 +133,12 @@ window.__bookReset = () => {
 };
 `;
 
+const remoteOrigin = config.cloudflareUrl ? new URL(config.cloudflareUrl).origin : '';
 const staticBackend = `
 // ---- Static backend: everything runs in the browser ----
 const STATIC_CONFIG = ${JSON.stringify(config)};
+// The site on Cloudflare: David's content, notices, opening hours and closed days come from it.
+const REMOTE_ORIGIN = ${JSON.stringify(remoteOrigin)};
 
 // ---- Google Calendar (when connected): googleCalendarUrl in config/site.json is the
 // address of the script in google-calendar/booking-calendar.gs. Times taken in the
@@ -158,28 +179,59 @@ function saveToCalendar(request) {
     .finally(() => busyByMonth.clear());
 }
 let staticConfigPromise = null;
+const liveSchedule = () => ({ ...STATIC_CONFIG.defaultSchedule, ...(getSiteData()?.schedule || {}) });
+function staticSiteConfig(data) {
+  const merged = mergeSiteConfig(STATIC_CONFIG, data?.content, REMOTE_ORIGIN);
+  const schedule = liveSchedule();
+  return {
+    business: STATIC_CONFIG.business,
+    services: merged.services,
+    prices: merged.prices,
+    currency: STATIC_CONFIG.currency,
+    timezone: STATIC_CONFIG.timezone,
+    today: nowInZone(STATIC_CONFIG.timezone).date,
+    maxDaysAhead: schedule.maxDaysAhead,
+    hours: schedule.weeklyHours,
+    handoff: 'whatsapp',
+    closedDays: Array.isArray(data?.closed) ? data.closed : [],
+  };
+}
 function loadConfig() {
   staticConfigPromise ??= Promise.resolve().then(() => {
-    siteConfig = {
-      business: STATIC_CONFIG.business,
-      services: STATIC_CONFIG.services,
-      prices: STATIC_CONFIG.prices,
-      currency: STATIC_CONFIG.currency,
-      timezone: STATIC_CONFIG.timezone,
-      today: nowInZone(STATIC_CONFIG.timezone).date,
-      maxDaysAhead: STATIC_CONFIG.defaultSchedule.maxDaysAhead,
-      hours: STATIC_CONFIG.defaultSchedule.weeklyHours,
-      handoff: 'whatsapp',
-    };
+    siteConfig = staticSiteConfig(getSiteData());
     applyTranslations();
     return siteConfig;
   });
   return staticConfigPromise;
 }
+// The latest from the site on Cloudflare, kept for the next visit too. Without an answer, the
+// page stays as it is (as it was on the last visit, or as it comes).
+function refreshSiteData() {
+  if (!REMOTE_ORIGIN) return;
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 8000);
+  fetch(REMOTE_ORIGIN + '/api/site', { signal: stop.signal, credentials: 'omit' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+      try {
+        localStorage.setItem('site-data', JSON.stringify(data));
+      } catch (e) {}
+      if (JSON.stringify(data) === JSON.stringify(getSiteData())) return;
+      setSiteData(data);
+      if (siteConfig) Object.assign(siteConfig, staticSiteConfig(data));
+      applyTranslations();
+      window.__homeRefresh?.();
+      window.__bookRefresh?.();
+    })
+    .catch(() => {})
+    .finally(() => clearTimeout(timer));
+}
 async function api(url) {
   const u = new URL(url, location.href);
   if (u.pathname.endsWith('/api/availability')) {
-    const schedule = STATIC_CONFIG.defaultSchedule;
+    const schedule = liveSchedule();
+    const closed = new Set(getSiteData()?.closed || []);
     const service = STATIC_CONFIG.services.find((s) => s.id === u.searchParams.get('service'));
     const now = nowInZone(STATIC_CONFIG.timezone);
     const last = addDays(now.date, schedule.maxDaysAhead);
@@ -196,7 +248,7 @@ async function api(url) {
         duration: service.duration,
         schedule,
         now,
-        blocked: taken === 'all',
+        blocked: taken === 'all' || closed.has(d),
         dayBookings: Array.isArray(taken) ? taken.map(([s, e]) => ({ start: toMinutes(s), end: toMinutes(e) })) : [],
       });
     }
@@ -274,6 +326,7 @@ const router = `
 const script = [
   stripModule(read('public/js/i18n.js')),
   stripModule(read('public/js/icons.js')),
+  stripModule(read('public/js/site-content.js')),
   stripModule(read('server/time.js')),
   stripModule(read('server/availability.js')),
   staticBackend,
@@ -281,6 +334,7 @@ const script = [
   `{\n${home}\n}`,
   `{\n${bookJs}\n}`,
   router,
+  'refreshSiteData();',
 ].join('\n');
 
 // Hebrew only; light unless the visitor picked dark with the button.

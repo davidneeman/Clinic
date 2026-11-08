@@ -5,7 +5,7 @@
 //   - keeps the public pages in Hebrew only, as on the GitHub Pages version
 //   - writes each page's title, description and link-preview tags (WhatsApp, Facebook…)
 //     into the HTML, since link previews don't run JavaScript
-//   - adds security headers to every page and file (dist/_headers)
+//   - adds security headers to every page and file (dist/_headers, from worker/page-headers.js)
 //
 // wrangler runs it before `wrangler dev` and `wrangler deploy` (wrangler.jsonc → build).
 // Usage: node scripts/build-cloudflare.mjs [out-dir]
@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PAGE_HEADERS } from '../worker/page-headers.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.resolve(process.argv[2] || path.join(root, 'dist'));
@@ -104,31 +105,15 @@ edit('book.html', [
 ]);
 
 // ---------- Security headers for every page and file ----------
-// The same rules as the Node server (server/security.js), plus HSTS: browsers only ever use
-// HTTPS for the site once they've seen it.
+// (worker/page-headers.js: the Worker puts the same ones on the pages it serves itself)
 
-const csp = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join('; ');
-
+const headerLines = Object.entries(PAGE_HEADERS)
+  .map(([name, value]) => `  ${name}: ${value}`)
+  .join('\n');
 fs.writeFileSync(
   path.join(outDir, '_headers'),
   `/*
-  Content-Security-Policy: ${csp}
-  Strict-Transport-Security: max-age=31536000; includeSubDomains
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
+${headerLines}
 
 /admin
   X-Robots-Tag: noindex, nofollow

@@ -6,6 +6,8 @@ The site runs on Cloudflare's free plan:
 |---|---|---|
 | Pages, photos, the video | Cloudflare's static files: `dist/`, built from `public/` by `scripts/build-cloudflare.mjs` | Unlimited, and they don't count toward the Worker's daily limit |
 | `/api/*`: free times, bookings, messages, the admin panel | The Worker: `worker/index.js` | 100,000 requests a day |
+| The home and booking pages, with David's texts, photos and notices in them; the photos he uploads (`/media/*`) | The Worker (`worker/content.js`) | Counted in the 100,000 a day: a visit is a few requests |
+| The photos David uploads in the admin panel | Workers KV, a store named `clinic-media` (the `MEDIA` binding) | 1 GB; 100,000 reads and 1,000 writes a day |
 | The data: bookings, closed days, opening hours, messages, David's clients | Cloudflare D1, a database named `clinic` (tables in `migrations/`) | 5 GB; 5 million rows read and 100,000 written a day |
 | Signing in to the admin panel | Face ID, Touch ID or a fingerprint (passkeys, `worker/passkeys.js`), no password. A person is added with a one-time link | Free |
 | Payment at booking | Grow's own secure page (`worker/grow.js`): card details never reach the site | Grow's fees only |
@@ -46,13 +48,14 @@ You'll need David's Cloudflare account. Cloudflare's dashboard is renamed now an
    npx wrangler login        # sign in as yourself, then choose David's account
    ```
 3. **The database.** Done: `clinic`, made with `npx wrangler d1 create clinic --jurisdiction eu`, so the data stays inside the EU (Israel's rules on sending personal data abroad allow EU countries). Its `database_id` is in `wrangler.jsonc`, and its tables were made with `npx wrangler d1 migrations apply clinic --remote`. Run that again whenever a new file appears in `migrations/`.
-4. **Deploys: Cloudflare builds the site from GitHub** (Workers Builds), so every push to the branch goes live by itself, with no token needed anywhere else:
+4. **The photo store.** Done: `clinic-media`, made with `npx wrangler kv namespace create clinic-media`. Its id is in `wrangler.jsonc` (`MEDIA`). It holds only the photos David uploads for the site (no personal data).
+5. **Deploys: Cloudflare builds the site from GitHub** (Workers Builds), so every push to the branch goes live by itself, with no token needed anywhere else:
    - Go to **Workers & Pages → Create → Import a repository** and connect GitHub.
    - Pick this repository, name the Worker `clinic` (it must match `name` in `wrangler.jsonc`), and keep the deploy command `npx wrangler deploy`.
    - Set the production branch to the branch the site is on.
 
    The site is then at `https://clinic.davidneeman.workers.dev`. Deploying from a computer with `npm run cf:deploy` works too. It doesn't work from a cloud session whose network proxy adds the Cloudflare token to every request: uploading the site's files needs a short-lived upload pass instead, which the proxy replaces.
-5. **The admin panel's sign-in: Face ID.** Nothing to set up. Each person signs in with a passkey: Face ID or Touch ID on an iPhone, iPad or Mac, a fingerprint on Android. The passkey stays on the phone (on Apple devices it also syncs through iCloud Keychain); the site keeps only its public half, so there's no password to steal or forget.
+6. **The admin panel's sign-in: Face ID.** Nothing to set up. Each person signs in with a passkey: Face ID or Touch ID on an iPhone, iPad or Mac, a fingerprint on Android. The passkey stays on the phone (on Apple devices it also syncs through iCloud Keychain); the site keeps only its public half, so there's no password to steal or forget.
    - **The first person** gets a one-time link from the database:
      ```sh
      npm run admin:invite -- https://clinic.davidneeman.workers.dev "דוד" 24
@@ -66,14 +69,14 @@ You'll need David's Cloudflare account. Cloudflare's dashboard is renamed now an
    **The client list** (**לקוחות**) fills itself: each confirmed booking adds its client, found by phone number, or joins an existing one. David can add clients by hand, keep private notes, count the sessions left on a 4-session card, and see each client's bookings. **מחיקת הלקוח** removes a client and erases their name and details from past bookings too.
 
    **Optional: Cloudflare Access** as a second way in, with a one-time code sent by email. In **Zero Trust**, add the One-time PIN login method and a self-hosted application for the paths `admin` and `api/admin`, allowing David's email. Then set `ACCESS_TEAM_DOMAIN` (`https://<team name>.cloudflareaccess.com`), `ACCESS_AUD` (the application's AUD tag) and `ADMIN_EMAILS` with `npx wrangler secret put`. The Worker checks Access's token on every admin request: its signature, that it's for this application, that it hasn't expired, and that the email is in `ADMIN_EMAILS`.
-6. **The domain** (question 18).
+7. **The domain** (question 18).
    1. Cloudflare doesn't sell `.co.il` addresses: buy it from an Israeli registrar, in David's name. A `.com` can be bought on Cloudflare itself.
    2. In Cloudflare, add the domain to David's account (**Add a site**, Free plan). At the registrar, switch its nameservers to the two that Cloudflare shows.
    3. Under **Workers & Pages → clinic → Settings → Domains & Routes → Add → Custom domain**, add the address, and `www.` too.
    4. Set `siteUrl` in `config/site.json` to `https://<domain>/`. Link previews, the canonical address and search results all use it.
    5. Make a new first sign-in link for the new address (step 5). If Cloudflare Access is used, move its application there too.
    6. Send the old GitHub Pages address to the new one.
-7. **Extra protection, also free:**
+8. **Extra protection, also free:**
    - Under **Security → WAF → Rate limiting rules**, add one rule: when the URI path starts with `/api/`, at most 60 requests in 10 seconds per IP, otherwise block. Floods are stopped before they reach the Worker or its daily limit.
    - **Backups:** D1 keeps a restorable history of the database (Time Travel), with nothing to set up. `npx wrangler d1 export clinic --remote --output <file>` writes a full copy, which contains clients' personal details. Keep such a copy encrypted, and never in this repository.
 
@@ -114,6 +117,18 @@ To turn it on:
 Before real payments go live, add Cloudflare Turnstile (a free check that a person, not a bot, is booking) to the booking form. It needs keys from the Cloudflare account. Without it, someone could start many bookings without paying, to hold times. Each hold already ends after 20 minutes, and each visitor can send only 5 bookings a minute.
 
 Refunds are done in Grow's dashboard (cancelling up to 24 hours before is free). Cancelling in the admin panel frees the time but doesn't refund.
+
+## The site editor (the admin panel's "האתר" tab)
+
+David changes the site himself, from his phone:
+- **Notices** at the top of every page: an update, something new, or something important (for example "the clinic is closed until …"). Each shows from a time until a time (or until he turns it off), and can also close the booking calendar on chosen days: those days show in **זמינות** as closed by the notice, and open again when the notice is paused or deleted. Visitors can close an update or a piece of news; an important notice stays. At most three show at once, the important ones first.
+- **The texts**: the headline, each section's title (also its name in the menu), the paragraphs, the quote, the notes before a session. A paragraph he empties disappears from the site.
+- **The treatments**: each one's name, description and photo, and **the prices** (a session, the card and how many sessions it has). The prices are the ones the booking page shows and asks to transfer by Bit or PayBox.
+- **The photos**: the one in the arch (the site's own, or his), the "about" photo and its description, and the gallery – its order, descriptions, and photos to replace, remove or add (up to 24).
+
+A photo he picks is framed on the phone in the shape it has on the site (the arch shows its window lines), then uploaded in the three sizes the site uses, as a new JPEG: the location and camera details in the phone's file don't go with it, and the server strips any that would. Uploads nothing uses any more are deleted after three days.
+
+His changes are kept in D1 (`settings` → `content`, and the `notices` table) and are on the site at once: the Worker puts them into the home and booking pages as they're served (with the same security headers), and `/api/config` gives the booking page his names and prices. The GitHub Pages copy reads the same from `/api/site` (allowed for that address only) and keeps it in the browser, so it looks the same.
 
 ## The iPhone calendar (iCloud)
 

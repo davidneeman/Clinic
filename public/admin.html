@@ -99,6 +99,7 @@
         <button class="tab" role="tab" id="tab-clients" aria-controls="panel-clients" aria-selected="false" data-tab="clients" data-i18n="admin.tabClients" hidden></button>
         <button class="tab" role="tab" id="tab-schedule" aria-controls="panel-schedule" aria-selected="false" data-tab="schedule" data-i18n="admin.tabSchedule"></button>
         <button class="tab" role="tab" id="tab-messages" aria-controls="panel-messages" aria-selected="false" data-tab="messages"><span data-i18n="admin.tabMessages"></span><span class="badge" id="unread-badge" hidden></span></button>
+        <button class="tab" role="tab" id="tab-site" aria-controls="panel-site" aria-selected="false" data-tab="site" data-i18n="admin.tabSite" hidden></button>
         <button class="tab" role="tab" id="tab-people" aria-controls="panel-people" aria-selected="false" data-tab="people" data-i18n="admin.tabPeople" hidden></button>
       </div>
 
@@ -153,6 +154,42 @@
         </div>
         <div id="client-detail" hidden></div>
         <div class="list" id="clients-list"></div>
+      </div>
+
+      <!-- The site: notices at the top of it, and its texts, prices and photos (admin-site.js) -->
+      <div role="tabpanel" id="panel-site" aria-labelledby="tab-site" hidden>
+        <section class="site-part" aria-labelledby="notices-title">
+          <div class="site-part-head">
+            <div>
+              <h2 class="subhead" id="notices-title" data-i18n="admin.noticesTitle"></h2>
+              <p class="panel-sub" data-i18n="admin.noticesSub"></p>
+            </div>
+            <button class="btn btn-primary btn-sm" type="button" id="notice-add" data-i18n="admin.noticeAdd"></button>
+          </div>
+          <div id="notice-editor" hidden></div>
+          <div class="list" id="notices-list"></div>
+        </section>
+
+        <section class="site-part" aria-labelledby="content-title">
+          <div class="site-part-head">
+            <div>
+              <h2 class="subhead" id="content-title" data-i18n="admin.contentTitle"></h2>
+              <p class="panel-sub" data-i18n="admin.contentSub"></p>
+            </div>
+            <a class="btn btn-outline btn-sm" href="/" target="_blank" rel="noopener" data-i18n="admin.viewSite"></a>
+          </div>
+          <div id="content-editor"></div>
+        </section>
+
+        <!-- While there are changes that aren't saved -->
+        <div class="save-bar" id="save-bar" hidden>
+          <div class="save-bar-inner">
+            <span class="save-bar-text" data-i18n="admin.unsaved"></span>
+            <button class="btn btn-primary btn-sm" type="button" id="content-save" data-i18n="admin.save"></button>
+            <button class="btn btn-ghost btn-sm" type="button" id="content-discard" data-i18n="admin.discard"></button>
+          </div>
+          <div id="save-alert" role="status"></div>
+        </div>
       </div>
 
       <!-- Who may sign in -->
