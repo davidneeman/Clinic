@@ -323,7 +323,40 @@ for (const b of document.querySelectorAll('[data-scope]')) {
 async function loadBookings() {
   const { bookings } = await guarded(() => api(`/api/admin/bookings?scope=${state.scope}`));
   state.bookings = bookings;
+  if (state.scope === 'upcoming') {
+    // Bookings waiting for David to see the payment (Bit or PayBox) and approve them.
+    const waiting = bookings.filter((b) => b.status === 'pending').length;
+    $('waiting-badge').hidden = !waiting;
+    $('waiting-badge').textContent = String(waiting);
+  }
   renderBookings();
+}
+
+/** What a booking paid by Bit or PayBox is for, and how much: one line for the list. */
+function planLine(b) {
+  if (!b.plan) return '';
+  const pack = state.config?.prices?.pack?.sessions ?? 4;
+  if (b.plan === 'card') {
+    const left = b.status === 'pending' ? (b.card_left == null ? t('admin.noCardFound') : t('admin.cardLeft', { n: b.card_left })) : '';
+    return [t('admin.planCard'), left].filter(Boolean).join(' · ');
+  }
+  const what = b.plan === 'pack' ? t('admin.planPack', { n: pack }) : t('admin.planSingle');
+  return `${what} · ${formatMoney(b.price)}`;
+}
+const formatMoney = (n) => `${Number(n || 0).toLocaleString('he-IL')} ₪`;
+
+async function approveBooking(b) {
+  const ask = b.plan === 'card' ? t('admin.approveCardConfirm', { name: b.name }) : t('admin.approveConfirm', { name: b.name, amount: formatMoney(b.price) });
+  if (!confirm(ask)) return;
+  try {
+    const { cardLeft } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
+    toast(cardLeft == null ? t('admin.approved') : `${t('admin.approved')} · ${t('admin.cardLeft', { n: cardLeft })}`);
+  } catch (err) {
+    if (err.status === 401) return showLogin();
+    toast(t(err.data?.error === 'slot_taken' ? 'admin.approveTaken' : 'common.error'));
+  }
+  loadBookings();
+  if (state.passkeys) loadClients();
 }
 
 function serviceName(id) {
@@ -341,7 +374,7 @@ function renderBookings() {
     ...state.bookings.map((b) =>
       el(
         'article',
-        { class: 'item' },
+        { class: `item${b.status === 'pending' ? ' is-unread' : ''}` },
         el('div', { class: 'item-when' }, el('strong', {}, b.time), el('small', {}, fmtDate(b.date))),
         el(
           'div',
@@ -355,12 +388,24 @@ function renderBookings() {
             b.email ? ' · ' : '',
             b.email ? el('a', { href: `mailto:${b.email}` }, el('bdi', {}, b.email)) : '',
           ),
+          b.plan
+            ? el(
+                'p',
+                { class: 'item-plan' },
+                b.status === 'pending' ? el('span', { class: 'chip-waiting' }, t('admin.awaitingPayment')) : '',
+                b.status === 'pending' ? ' ' : '',
+                planLine(b),
+              )
+            : '',
           b.notes ? el('p', { class: 'item-notes' }, b.notes) : '',
         ),
         el(
           'div',
           { class: 'item-actions' },
-          b.status === 'confirmed' && state.scope === 'upcoming'
+          b.status === 'pending' && state.scope === 'upcoming'
+            ? el('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => approveBooking(b) }, t(b.plan === 'card' ? 'admin.approveCard' : 'admin.approve'))
+            : '',
+          ['confirmed', 'pending'].includes(b.status) && state.scope === 'upcoming'
             ? el('button', { type: 'button', class: 'btn btn-danger btn-sm', onclick: () => cancelBooking(b) }, t('admin.cancel'))
             : '',
         ),

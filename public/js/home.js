@@ -768,3 +768,41 @@ loadConfig()
 
 onLangChange(renderAll);
 setInterval(renderHours, 60_000);
+
+// ---------------------------------------------------------------------------
+// Choosing the opening photo: open the site with ?photo (or ?photo=1, 2 or 3) to compare
+// David's photos in the arch. Only with that link; the normal site keeps its photo until
+// one is chosen.
+// ---------------------------------------------------------------------------
+
+const PHOTOS = [
+  ['room', 'עכשיו'],
+  ['david-1', '1'],
+  ['david-2', '2'],
+  ['david-3', '3'],
+];
+
+function initPhotoChooser() {
+  const asked = /[?&]photo(?:=(\d))?(?:&|$)/.exec(location.search);
+  const img = document.querySelector('.hero-room img');
+  if (!asked || !img) return;
+  const buttons = PHOTOS.map(([id, label]) =>
+    el('button', { type: 'button', 'data-photo': id }, el('img', { src: `images/${id}-640.jpg`, alt: '' }), el('span', {}, label)),
+  );
+  const show = (id, scroll) => {
+    img.srcset = `images/${id}-640.jpg 640w, images/${id}.jpg 960w, images/${id}-1440.jpg 1440w`;
+    img.src = `images/${id}.jpg`;
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.photo === id));
+    // On phones the arch is below the opening buttons: bring it into view.
+    if (scroll) img.closest('.hero-room').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const bar = el('div', { class: 'photo-chooser', role: 'group', 'aria-label': 'בחירת תמונה' }, ...buttons);
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b) show(b.dataset.photo, true);
+  });
+  document.body.append(bar);
+  show((PHOTOS[Number(asked[1])] || PHOTOS[1])[0], false);
+}
+
+initPhotoChooser();

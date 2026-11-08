@@ -43,8 +43,9 @@
   // Not secret. Everything else (Access, Grow, iCloud) is a secret instead:
   // `npx wrangler secret put …`, see worker/README.md.
   "vars": {
-    // "whatsapp" (as today), "pay" (book and pay on the site) or "online" (book, no payment)
-    "BOOKING_MODE": "whatsapp",
+    // "transfer" (book on the site, pay by Bit or PayBox to David's phone, he approves),
+    // "whatsapp" (requests by WhatsApp), "pay" (pay on the site through Grow) or "online"
+    "BOOKING_MODE": "transfer",
     // Grow's test environment until the account is approved for real payments
     "GROW_ENV": "sandbox",
     // The calendar in his iCloud that bookings go into (made the first time if missing)

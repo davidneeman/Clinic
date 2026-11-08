@@ -139,6 +139,13 @@ export function openAdminStore(db, clock = () => new Date()) {
       ).results;
     },
     client: (id) => db.prepare('SELECT * FROM clients WHERE id = ?').bind(id).first(),
+    clientByPhone: (phone) => db.prepare('SELECT id, name, card_left FROM clients WHERE phone = ?').bind(phoneKey(phone)).first(),
+    /** Sessions added to (or, negative, taken from) a client's card; never below 0. → what's left. */
+    addCardSessions: (id, delta) =>
+      db
+        .prepare(`UPDATE clients SET card_left = MAX(0, MIN(100, card_left + ?)), updated_at = datetime('now') WHERE id = ? RETURNING card_left`)
+        .bind(delta, id)
+        .first('card_left'),
     clientBookings: async (id) =>
       (
         await db

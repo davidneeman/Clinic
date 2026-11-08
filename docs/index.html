@@ -5193,6 +5193,173 @@ html.js .reveal:not(.is-visible) {
   }
 }
 
+/* ---------- Paying by Bit or PayBox (BOOKING_MODE "transfer") ---------- */
+
+/* What the client pays for: one session, the card, or a session from their card */
+.plan-options {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 4px 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.plan-options legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.plan-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.plan-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.plan-option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.plan-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-name {
+  font-weight: 600;
+}
+
+.plan-sub,
+.plan-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.plan-note {
+  margin: 2px 0 0;
+}
+
+.plan-price {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* After saving: where to send the payment, then the booking waits for approval */
+.pay-transfer {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 4px;
+  padding: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: start;
+}
+
+.pay-to {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.pay-phone {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pay-note {
+  margin: 0;
+}
+
+.pay-note .ref {
+  font-weight: 700;
+}
+
+.pay-status {
+  margin: 14px 0 0;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.pay-status.is-done {
+  color: var(--success);
+}
+
+/* ---------- The bar for choosing the opening photo (only with ?photo) ---------- */
+.photo-chooser {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 96;
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  margin-inline: auto;
+  padding: 5px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: #221c17;
+  box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.55);
+  font: 500 0.95rem/1 var(--font-body, system-ui), sans-serif;
+}
+
+.photo-chooser button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 14px 4px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #f1e9db;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+[dir='rtl'] .photo-chooser button {
+  padding: 4px 4px 4px 14px;
+}
+
+.photo-chooser button[aria-pressed='true'] {
+  background: #f1e9db;
+  color: #221c17;
+}
+
+.photo-chooser img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+@media (max-width: 760px) {
+  .photo-chooser {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ---------- The bar for comparing the colour options (only with ?options) ---------- */
 
 .pal-switcher {
@@ -5667,6 +5834,21 @@ html.js .reveal:not(.is-visible) {
   margin-bottom: 0;
 }
 
+/* Bookings paid by Bit or PayBox: what for, and those waiting for approval */
+.item-plan {
+  margin-top: 4px !important;
+}
+
+.chip-waiting {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 /* Clients and admins: rows without a date box */
 .item.item-plain {
   grid-template-columns: 1fr auto;
@@ -6037,6 +6219,25 @@ html.js .reveal:not(.is-visible) {
                 <label for="b-notes"><span data-i18n="book.notes"></span> <span class="optional" data-i18n="contact.optional"></span></label>
                 <textarea id="b-notes" name="notes" maxlength="1000"></textarea>
               </div>
+              <!-- Paying by Bit or PayBox: what the client pays for (only then; book.js) -->
+              <fieldset class="plan-options" id="plan-options" hidden>
+                <legend data-i18n="book.planTitle"></legend>
+                <label class="plan-option">
+                  <input type="radio" name="plan" value="single" checked>
+                  <span class="plan-text"><span class="plan-name" data-i18n="book.planSingle"></span></span>
+                  <span class="plan-price" data-plan-price="single"></span>
+                </label>
+                <label class="plan-option">
+                  <input type="radio" name="plan" value="pack">
+                  <span class="plan-text"><span class="plan-name" id="plan-pack-name"></span><span class="plan-sub" id="plan-pack-sub"></span></span>
+                  <span class="plan-price" data-plan-price="pack"></span>
+                </label>
+                <label class="plan-option">
+                  <input type="radio" name="plan" value="card">
+                  <span class="plan-text"><span class="plan-name" data-i18n="book.planCard"></span><span class="plan-sub" data-i18n="book.planCardSub"></span></span>
+                </label>
+                <p class="plan-note" data-i18n="book.planHow"></p>
+              </fieldset>
               <label class="checkbox">
                 <input type="checkbox" name="consent" required>
                 <span data-i18n="book.consent"></span>
@@ -6067,6 +6268,16 @@ html.js .reveal:not(.is-visible) {
         <h2 id="confirm-title" tabindex="-1" data-i18n="book.successTitle"></h2>
         <p id="confirm-text"></p>
         <dl id="confirm-details"></dl>
+        <!-- Paying by Bit or PayBox: where to send it; then it waits for David's approval -->
+        <div class="pay-transfer" id="confirm-pay" hidden>
+          <div class="pay-to">
+            <span data-i18n="book.payTo"></span>
+            <bdi class="pay-phone" id="pay-phone"></bdi>
+            <button class="btn btn-outline btn-sm" type="button" id="copy-phone" data-i18n="book.copy"></button>
+          </div>
+          <p class="pay-note" id="pay-note"></p>
+        </div>
+        <p class="pay-status" id="pay-status" role="status" hidden></p>
         <p class="panel-sub" id="confirm-email" data-i18n="book.successEmail" hidden></p>
         <ul class="prep">
           <li class="prep-head"><p class="prep-title" data-i18n="book.prepTitle"></p></li>
@@ -6355,6 +6566,26 @@ const dictionaries = {
       waTitle: 'כמעט סיימנו!',
       waText: 'הבקשה מוכנה בוואטסאפ. כדי לסיים, שלחו את ההודעה.',
       waButton: 'פתיחת וואטסאפ',
+      planTitle: 'תשלום',
+      planSingle: 'מפגש בודד',
+      planPackSub: 'המפגש הזה ועוד {n}',
+      planCard: 'יש לי כרטיסייה',
+      planCardSub: 'מפגש מהכרטיסייה, בלי תשלום עכשיו',
+      planHow: 'התשלום בביט או ב-PayBox, אחרי שמירת התור.',
+      saveBooking: 'שמירת התור',
+      saving: 'שומרים את התור…',
+      transferTitle: 'התור שמור לך',
+      transferText: 'כדי לאשר את התור, צריך להעביר {amount} בביט או ב-PayBox. אאשר את התור כשאראה את התשלום.',
+      transferCardText: 'התור שמור לך מהכרטיסייה. אאשר אותו בהקדם.',
+      payTo: 'למספר',
+      copy: 'העתקה',
+      copied: 'המספר הועתק',
+      payNoteBefore: 'בהערה של ההעברה כתבו את מספר ההזמנה: ',
+      amount: 'לתשלום',
+      fromCard: 'מהכרטיסייה',
+      statusPending: 'ממתין לאישור התשלום',
+      statusConfirmed: 'התור אושר!',
+      statusCancelled: 'התור בוטל',
     },
     admin: {
       title: 'ניהול האתר',
@@ -6407,6 +6638,17 @@ const dictionaries = {
       deviceAlready: 'הכניסה כבר שמורה במכשיר הזה.',
       reauth: 'כדי לשמור כניסה במכשיר, צריך להיכנס מחדש: יציאה, ואז כניסה.',
       devices: 'מכשירים: {n}',
+      awaitingPayment: 'ממתין לתשלום',
+      planSingle: 'מפגש בודד',
+      planPack: 'כרטיסייה חדשה ({n} מפגשים)',
+      planCard: 'מהכרטיסייה',
+      noCardFound: 'לא נמצאה כרטיסייה למספר הזה',
+      approve: 'אישור תשלום',
+      approveCard: 'אישור מהכרטיסייה',
+      approveConfirm: 'לאשר את התור של {name}? כדאי לאשר אחרי שהגיע התשלום ({amount}).',
+      approveCardConfirm: 'לאשר את התור של {name} מהכרטיסייה?',
+      approved: 'התור אושר',
+      approveTaken: 'המועד כבר נתפס בינתיים. אפשר לבטל את ההזמנה הזו.',
       passkeyLogin: 'כניסה עם Face\u00a0ID',
       signInTitle: 'כניסה לניהול האתר',
       joinTitle: 'הצטרפות לניהול האתר',
@@ -6685,6 +6927,26 @@ const dictionaries = {
       waTitle: 'Almost done!',
       waText: 'Your request is ready in WhatsApp. Send the message and I’ll get back to you to confirm the time.',
       waButton: 'Open WhatsApp',
+      planTitle: 'Payment',
+      planSingle: 'One session',
+      planPackSub: 'This session and {n} more',
+      planCard: 'I have a card',
+      planCardSub: 'A session from my card, nothing to pay now',
+      planHow: 'You pay with Bit or PayBox after saving the booking.',
+      saveBooking: 'Save the booking',
+      saving: 'Saving…',
+      transferTitle: 'Your time is held',
+      transferText: 'To confirm the booking, send {amount} with Bit or PayBox. I’ll confirm it as soon as I see the payment.',
+      transferCardText: 'Your time is held, from your card. I’ll confirm it soon.',
+      payTo: 'To',
+      copy: 'Copy',
+      copied: 'Number copied',
+      payNoteBefore: 'In the transfer’s note, write the booking number: ',
+      amount: 'To pay',
+      fromCard: 'From the card',
+      statusPending: 'Waiting for the payment to be confirmed',
+      statusConfirmed: 'Your booking is confirmed!',
+      statusCancelled: 'The booking was cancelled',
     },
     admin: {
       title: 'Site admin',
@@ -6737,6 +6999,17 @@ const dictionaries = {
       deviceAlready: 'The sign-in is already saved on this device.',
       reauth: 'To save the sign-in on a device, sign in again: log out, then sign in.',
       devices: 'Devices: {n}',
+      awaitingPayment: 'Waiting for payment',
+      planSingle: 'One session',
+      planPack: 'New card ({n} sessions)',
+      planCard: 'From the card',
+      noCardFound: 'No card found for this number',
+      approve: 'Approve payment',
+      approveCard: 'Approve from the card',
+      approveConfirm: 'Approve the booking for {name}? Best once the payment ({amount}) has arrived.',
+      approveCardConfirm: 'Approve the booking for {name} from their card?',
+      approved: 'Booking approved',
+      approveTaken: 'That time was taken meanwhile. You can cancel this booking.',
       passkeyLogin: 'Sign in with Face\u00a0ID',
       signInTitle: 'Sign in to the site admin',
       joinTitle: 'Join the site admin',
@@ -6971,7 +7244,7 @@ function slotsForDay({ date, duration, schedule, dayBookings = [], blocked = fal
 
 
 // ---- Static backend: everything runs in the browser ----
-const STATIC_CONFIG = {"siteUrl":"https://davidneeman.github.io/Clinic/","googleCalendarUrl":"","business":{"name":{"he":"דוד נאמן","en":"David Neeman"},"tagline":{"he":"יעוץ וטיפול","en":"Consultation & treatment"},"phone":"+972 58-434-4047","whatsapp":"972584344047","email":"","address":{"he":"דרויאנוב 5, תל אביב (בית כלל)","en":"5 Druyanov St., Tel Aviv (Beit Klal)"},"instagram":"","facebook":""},"timezone":"Asia/Jerusalem","currency":"ILS","services":[{"id":"dry-needling","name":{"he":"דיקור מערבי יבש","en":"Western dry needling"},"description":{"he":"שיטה לטיפול בכאבי שרירים או מגבלות תנועה אחרי פציעות או עומס. ע״י אבחון מדויק ונכון של הגוף ואיתור נקודות טריגר מתבצע דיקור במטרה לשחרר ולהתיר את הטריגר פוינטס.","en":"A method for treating muscle pain or limited movement after injuries or overload. Through an accurate assessment of the body and locating trigger points, needling is done to release the trigger points."},"duration":60,"price":350,"icon":"leaf","image":"images/svc-dry.jpg"},{"id":"cosmetic","name":{"he":"דיקור קוסמטי","en":"Cosmetic acupuncture"},"description":{"he":"מטרתו לאזן ולשחרר את שרירי הפנים והצוואר במטרה לשפר את תפקוד השרירים בפנים (הפנים מורכבים מ-43 שרירים שונים) ולעודד מראה בריא, מתוח וחיוני. כמו כן משפר זרימת דם וחמצן לרקמות העור ומסייע בחידוש רקמת העור ויצירה של קולגן ואלסטין.","en":"Its aim is to balance and release the face and neck muscles to improve how the facial muscles work (the face is made of 43 different muscles) and to encourage a healthy, firm and vital look. It also improves blood and oxygen flow to the skin tissue and helps skin renewal and the production of collagen and elastin."},"duration":60,"price":350,"icon":"sparkle","image":"images/svc-cosmetic.jpg"},{"id":"stress","name":{"he":"דיקור לסטרס","en":"Acupuncture for stress"},"description":{"he":"משלב טכניקות מהעולם היפני והסיני. נקודות עוצמתיות שמטפלות ברמות קורטיזול גבוהות ובסטרס ותורמות לשלוות נפש ואיזון הורמונלי.","en":"Combines techniques from the Japanese and Chinese traditions. Powerful points that address high cortisol levels and stress and contribute to peace of mind and hormonal balance."},"duration":60,"price":350,"icon":"sun","image":"images/svc-stress.jpg"}],"prices":{"session":{"minutes":60,"price":350},"pack":{"sessions":4,"price":1200}},"defaultSchedule":{"weeklyHours":{"0":[["12:30","19:00"]],"1":[["08:00","14:30"]],"2":[],"3":[["13:00","19:00"]],"4":[["10:00","19:00"]],"5":[],"6":[]},"slotInterval":30,"bufferMinutes":15,"minNoticeHours":0,"maxDaysAhead":30}};
+const STATIC_CONFIG = {"siteUrl":"https://davidneeman.github.io/Clinic/","googleCalendarUrl":"","business":{"name":{"he":"דוד נאמן","en":"David Neeman"},"tagline":{"he":"יעוץ וטיפול","en":"Consultation & treatment"},"phone":"+972 58-434-4047","whatsapp":"972584344047","email":"","address":{"he":"דרויאנוב 5, תל אביב (בית כלל)","en":"5 Druyanov St., Tel Aviv (Beit Klal)"},"instagram":"","facebook":""},"timezone":"Asia/Jerusalem","currency":"ILS","services":[{"id":"dry-needling","name":{"he":"דיקור מערבי יבש","en":"Western dry needling"},"description":{"he":"שיטה לטיפול בכאבי שרירים או מגבלות תנועה אחרי פציעות או עומס. ע״י אבחון מדויק ונכון של הגוף ואיתור נקודות טריגר מתבצע דיקור במטרה לשחרר ולהתיר את הטריגר פוינטס.","en":"A method for treating muscle pain or limited movement after injuries or overload. Through an accurate assessment of the body and locating trigger points, needling is done to release the trigger points."},"duration":60,"price":350,"icon":"leaf","image":"images/svc-dry.jpg"},{"id":"cosmetic","name":{"he":"דיקור קוסמטי","en":"Cosmetic acupuncture"},"description":{"he":"מטרתו לאזן ולשחרר את שרירי הפנים והצוואר במטרה לשפר את תפקוד השרירים בפנים (הפנים מורכבים מ-43 שרירים שונים) ולעודד מראה בריא, מתוח וחיוני. כמו כן משפר זרימת דם וחמצן לרקמות העור ומסייע בחידוש רקמת העור ויצירה של קולגן ואלסטין.","en":"Its aim is to balance and release the face and neck muscles to improve how the facial muscles work (the face is made of 43 different muscles) and to encourage a healthy, firm and vital look. It also improves blood and oxygen flow to the skin tissue and helps skin renewal and the production of collagen and elastin."},"duration":60,"price":350,"icon":"sparkle","image":"images/svc-cosmetic.jpg"},{"id":"stress","name":{"he":"דיקור סטרס","en":"Acupuncture for stress"},"description":{"he":"משלב טכניקות מהעולם היפני והסיני. נקודות עוצמתיות שמטפלות ברמות קורטיזול גבוהות ובסטרס ותורמות לשלוות נפש ואיזון הורמונלי.","en":"Combines techniques from the Japanese and Chinese traditions. Powerful points that address high cortisol levels and stress and contribute to peace of mind and hormonal balance."},"duration":60,"price":350,"icon":"sun","image":"images/svc-stress.jpg"}],"prices":{"session":{"minutes":60,"price":350},"pack":{"sessions":4,"price":1200}},"defaultSchedule":{"weeklyHours":{"0":[["12:30","19:00"]],"1":[["08:00","14:30"]],"2":[],"3":[["13:00","19:00"]],"4":[["10:00","19:00"]],"5":[],"6":[]},"slotInterval":30,"bufferMinutes":15,"minNoticeHours":0,"maxDaysAhead":30}};
 
 // ---- Google Calendar (when connected): googleCalendarUrl in config/site.json is the
 // address of the script in google-calendar/booking-calendar.gs. Times taken in the
@@ -8554,6 +8827,44 @@ loadConfig()
 onLangChange(renderAll);
 setInterval(renderHours, 60_000);
 
+// ---------------------------------------------------------------------------
+// Choosing the opening photo: open the site with ?photo (or ?photo=1, 2 or 3) to compare
+// David's photos in the arch. Only with that link; the normal site keeps its photo until
+// one is chosen.
+// ---------------------------------------------------------------------------
+
+const PHOTOS = [
+  ['room', 'עכשיו'],
+  ['david-1', '1'],
+  ['david-2', '2'],
+  ['david-3', '3'],
+];
+
+function initPhotoChooser() {
+  const asked = /[?&]photo(?:=(\d))?(?:&|$)/.exec(location.search);
+  const img = document.querySelector('.hero-room img');
+  if (!asked || !img) return;
+  const buttons = PHOTOS.map(([id, label]) =>
+    el('button', { type: 'button', 'data-photo': id }, el('img', { src: `images/${id}-640.jpg`, alt: '' }), el('span', {}, label)),
+  );
+  const show = (id, scroll) => {
+    img.srcset = `images/${id}-640.jpg 640w, images/${id}.jpg 960w, images/${id}-1440.jpg 1440w`;
+    img.src = `images/${id}.jpg`;
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.photo === id));
+    // On phones the arch is below the opening buttons: bring it into view.
+    if (scroll) img.closest('.hero-room').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const bar = el('div', { class: 'photo-chooser', role: 'group', 'aria-label': 'בחירת תמונה' }, ...buttons);
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b) show(b.dataset.photo, true);
+  });
+  document.body.append(bar);
+  show((PHOTOS[Number(asked[1])] || PHOTOS[1])[0], false);
+}
+
+initPhotoChooser();
+
 }
 {
 
@@ -8801,7 +9112,7 @@ function renderSummary() {
     ['book.service', s && pick(s.name)],
     ['book.date', state.date && fmtDate(state.date)],
     ['book.time', state.time],
-    s?.price != null && ['book.price', formatPrice(s.price)],
+    s?.price != null && ['book.price', viaTransfer() ? planPrice(selectedPlan()) : formatPrice(s.price)],
   ].filter(Boolean);
   $('summary').replaceChildren(
     ...rows.flatMap(([label, value]) => [
@@ -8848,6 +9159,25 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 // Paying on the site (Grow): the client pays on Grow's secure page and comes back here. The
 // payment company asks for a full name and an Israeli mobile number.
 const viaPayment = () => state.config?.payments === true;
+
+// Paying by Bit or PayBox to David's phone: the client picks one session, the card of
+// sessions (this one included) or a session from a card they have; the booking then waits
+// for David to see the payment and approve it.
+const viaTransfer = () => Boolean(state.config?.transfer);
+const selectedPlan = () => document.querySelector('#plan-options input[name="plan"]:checked')?.value || 'single';
+function planAmount(plan) {
+  const prices = state.config.prices;
+  return plan === 'pack' ? prices.pack.price : plan === 'card' ? 0 : (state.service?.price ?? prices.session.price);
+}
+const planPrice = (plan) => (plan === 'card' ? t('book.fromCard') : formatPrice(planAmount(plan)));
+
+function renderPlans() {
+  if (!viaTransfer()) return;
+  const { pack } = state.config.prices;
+  $('plan-pack-name').textContent = t('prices.pack', { n: pack.sessions });
+  $('plan-pack-sub').textContent = t('book.planPackSub', { n: pack.sessions - 1 });
+  for (const node of document.querySelectorAll('[data-plan-price]')) node.textContent = formatPrice(planAmount(node.dataset.planPrice));
+}
 const isFullName = (name) => name.trim().split(/\s+/).filter((w) => w.replace(/[^\p{L}\p{N}]/gu, '').length >= 2).length >= 2;
 function isMobile(phone) {
   let digits = phone.replace(/\D+/g, '');
@@ -8888,22 +9218,23 @@ async function submit(e) {
 
   const bad = [];
   const paying = viaPayment();
+  const transfer = viaTransfer();
   if ((data.name || '').trim().length < 2 || (paying && !isFullName(data.name))) bad.push('name');
-  if (paying || !viaWhatsApp()) {
+  if (paying || transfer || !viaWhatsApp()) {
     if (!PHONE_RE.test((data.phone || '').trim()) || (paying && !isMobile(data.phone))) bad.push('phone');
     if (data.email && !EMAIL_RE.test(data.email.trim())) bad.push('email');
   }
   if (!data.consent) bad.push('consent');
   const messages = paying ? PAY_MESSAGES : {};
   if (bad.length) return showFieldErrors(form, bad, messages);
-  if (!paying && viaWhatsApp()) return handOffToWhatsApp(data);
+  if (!paying && !transfer && viaWhatsApp()) return handOffToWhatsApp(data);
 
   const button = $('confirm-btn');
   button.disabled = true;
-  button.textContent = t(paying ? 'book.paying' : 'book.confirming');
+  button.textContent = t(paying ? 'book.paying' : transfer ? 'book.saving' : 'book.confirming');
   let leaving = false;
   try {
-    const { booking, payUrl, token } = await api('/api/bookings', {
+    const { booking, payUrl, token, transfer: payTo } = await api('/api/bookings', {
       method: 'POST',
       body: {
         serviceId: state.service.id,
@@ -8915,8 +9246,10 @@ async function submit(e) {
         notes: data.notes,
         consent: true,
         lang: getLang(),
+        plan: transfer ? selectedPlan() : undefined,
       },
     });
+    if (payTo) return showConfirmation(booking, false, null, payTo);
     if (payUrl) {
       // Off to Grow's page. This tab remembers the booking for when the client comes back.
       saved.set(booking.ref, { token, booking });
@@ -8932,7 +9265,7 @@ async function submit(e) {
       goTo(2);
       setAlert('time-alert', 'error', t('book.slotTaken'));
     } else if (err.status === 400) {
-      showFieldErrors(form, err.data.fields, messages);
+      showFieldErrors(form, (err.data.fields || []).filter((f) => f !== 'plan'), messages);
     } else {
       const key = err.status === 429 ? 'errors.rate' : paying && (err.status === 502 || err.status === 503) ? 'book.payError' : 'common.error';
       setAlert('details-alert', 'error', t(key));
@@ -9001,11 +9334,29 @@ let confirmed = null;
 
 function renderConfirmation() {
   if (!confirmed) return;
-  const { booking, whatsappHref } = confirmed;
+  const { booking, whatsappHref, payTo, status } = confirmed;
   const title = $('confirm-title');
-  title.dataset.i18n = whatsappHref ? 'book.waTitle' : 'book.successTitle';
+  title.dataset.i18n = payTo ? (status === 'confirmed' ? 'book.statusConfirmed' : 'book.transferTitle') : whatsappHref ? 'book.waTitle' : 'book.successTitle';
   title.textContent = t(title.dataset.i18n);
-  $('confirm-text').textContent = whatsappHref ? t('book.waText') : t('book.successText', { name: booking.name });
+  $('confirm-text').textContent = payTo
+    ? booking.plan === 'card'
+      ? t('book.transferCardText')
+      : t('book.transferText', { amount: formatPrice(booking.price) })
+    : whatsappHref
+      ? t('book.waText')
+      : t('book.successText', { name: booking.name });
+  // Bit or PayBox: where to send it, and the booking's state while David hasn't approved yet.
+  $('confirm-pay').hidden = !(payTo && booking.plan !== 'card' && status === 'pending');
+  if (payTo) {
+    $('pay-phone').textContent = payTo.phone;
+    $('pay-note').replaceChildren(t('book.payNoteBefore'), el('strong', { class: 'ref' }, booking.ref));
+    const statusKey = { confirmed: 'book.statusConfirmed', cancelled: 'book.statusCancelled', expired: 'book.statusCancelled' }[status] || 'book.statusPending';
+    $('pay-status').textContent = t(statusKey);
+    $('pay-status').classList.toggle('is-done', status === 'confirmed');
+    $('pay-status').hidden = false;
+  } else {
+    $('pay-status').hidden = true;
+  }
   $('confirm-whatsapp').hidden = !whatsappHref;
   if (whatsappHref) $('confirm-whatsapp').href = whatsappHref;
   const rows = [
@@ -9014,12 +9365,14 @@ function renderConfirmation() {
     ['book.date', fmtDate(booking.date)],
     ['book.time', el('bdi', {}, booking.time)],
     booking.paid && booking.price != null && ['book.paid', formatPrice(booking.price)],
+    payTo && ['book.amount', booking.plan === 'card' ? t('book.fromCard') : formatPrice(booking.price)],
   ].filter(Boolean);
   $('confirm-details').replaceChildren(...rows.flatMap(([k, v]) => [el('dt', {}, t(k)), el('dd', {}, v)]));
 }
 
-function showConfirmation(booking, emailed, whatsappHref = null) {
-  confirmed = { booking, whatsappHref };
+function showConfirmation(booking, emailed, whatsappHref = null, payTo = null) {
+  confirmed = { booking, whatsappHref, payTo, status: payTo ? 'pending' : null };
+  if (payTo) watchApproval(booking.ref);
   $('booking-flow').hidden = true;
   document.querySelector('.page-hero').hidden = true;
   $('confirmation').hidden = false;
@@ -9028,6 +9381,32 @@ function showConfirmation(booking, emailed, whatsappHref = null) {
   window.scrollTo({ top: 0, behavior: 'instant' });
   $('confirm-title').focus({ preventScroll: true });
 }
+
+/** While the page stays open, shows when David approves the booking (or cancels it). */
+function watchApproval(ref) {
+  let tries = 0;
+  const timer = setInterval(async () => {
+    tries++;
+    try {
+      const { status } = await api(`/api/bookings/status?ref=${encodeURIComponent(ref)}`);
+      if (status !== confirmed?.status) {
+        confirmed.status = status;
+        renderConfirmation();
+      }
+      if (status !== 'pending') clearInterval(timer);
+    } catch {}
+    if (tries >= 80) clearInterval(timer); // about 20 minutes
+  }, 15_000);
+}
+
+$('copy-phone').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(confirmed.payTo.phone.replace(/\D+/g, ''));
+    toast(t('book.copied'));
+  } catch {
+    toast(confirmed.payTo.phone);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Wiring
@@ -9042,6 +9421,7 @@ function renderAll() {
   }
   renderSummary();
   renderConsent();
+  renderPlans();
   renderConfirmation();
 }
 
@@ -9069,6 +9449,14 @@ loadConfig()
     if (viaPayment()) {
       $('confirm-btn').dataset.i18n = 'book.toPayment';
       $('confirm-btn').textContent = t('book.toPayment');
+    } else if (viaTransfer()) {
+      $('plan-options').hidden = false;
+      $('confirm-btn').dataset.i18n = 'book.saveBooking';
+      $('confirm-btn').textContent = t('book.saveBooking');
+      const wanted = new URLSearchParams(location.search).get('plan');
+      const pick = document.querySelector(`#plan-options input[value="${wanted === 'pack' || wanted === 'card' ? wanted : 'single'}"]`);
+      if (pick) pick.checked = true;
+      $('plan-options').addEventListener('change', renderSummary);
     } else if (viaWhatsApp()) {
       // The request is sent from the client's own WhatsApp, so the practitioner
       // already sees their number: no phone or email fields.

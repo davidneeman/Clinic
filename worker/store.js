@@ -77,19 +77,20 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
   /**
    * Checks the time is free, then adds the booking in one statement that only goes in when no
    * other booking takes an overlapping time (with the break around it), so two people can't
-   * get the same time together. With `hold` (minutes), the booking waits for its payment as
-   * 'pending' and keeps the time that long. Throws SlotTakenError when the time isn't free.
+   * get the same time together. With `hold` (minutes) or `holdUntil` (a moment), the booking
+   * waits for its payment as 'pending' and keeps the time until then. Throws SlotTakenError
+   * when the time isn't free.
    */
-  async function createBooking(b, now, { hold = 0, busy } = {}) {
+  async function createBooking(b, now, { hold = 0, holdUntil = null, busy } = {}) {
     const schedule = await getSchedule();
     const free = (await availability({ from: b.date, to: b.date, duration: b.duration, now, schedule, busy }))[b.date];
     if (!free.includes(b.time)) throw new SlotTakenError('slot not available');
 
-    const pending = hold > 0;
-    const holdUntil = pending ? new Date(clock().getTime() + hold * 60_000).toISOString() : null;
+    const until = holdUntil ? new Date(holdUntil).toISOString() : hold > 0 ? new Date(clock().getTime() + hold * 60_000).toISOString() : null;
+    const pending = Boolean(until);
     const insert = db.prepare(`
-      INSERT INTO bookings (ref, service_id, date, time, duration, name, phone, email, notes, lang, status, price, hold_until, token)
-      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?13, ?14, ?15, ?16
+      INSERT INTO bookings (ref, service_id, date, time, duration, name, phone, email, notes, lang, status, price, hold_until, token, plan)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?13, ?14, ?15, ?16, ?18
       WHERE NOT EXISTS (
         SELECT 1 FROM bookings
         WHERE date = ?3 AND ${takes('', '?17')}
@@ -103,7 +104,7 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
           .bind(
             newRef(), b.serviceId, b.date, b.time, b.duration, b.name, b.phone, b.email || null, b.notes || null, b.lang,
             toMinutes(b.time), schedule.bufferMinutes,
-            pending ? 'pending' : 'confirmed', b.price ?? null, holdUntil, pending ? newToken() : null, nowIso(),
+            pending ? 'pending' : 'confirmed', b.price ?? null, until, pending ? newToken() : null, nowIso(), b.plan ?? null,
           )
           .first();
         if (!row) throw new SlotTakenError('slot not available');
@@ -143,14 +144,15 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
         ? "SELECT * FROM bookings WHERE status = 'confirmed' AND date < ?1 ORDER BY date DESC, time DESC LIMIT 200"
         : scope === 'cancelled'
           ? "SELECT * FROM bookings WHERE status = 'cancelled' ORDER BY date DESC, time DESC LIMIT 200"
-          : "SELECT * FROM bookings WHERE status = 'confirmed' AND date >= ?1 ORDER BY date, time";
+          : // Coming up: confirmed, and those still waiting for the payment to be approved.
+            `SELECT * FROM bookings WHERE ${takes('', '?2')} AND date >= ?1 ORDER BY date, time`;
     const stmt = db.prepare(sql);
-    return (await (scope === 'cancelled' ? stmt : stmt.bind(today)).all()).results;
+    return (await (scope === 'cancelled' ? stmt : scope === 'past' ? stmt.bind(today) : stmt.bind(today, nowIso())).all()).results;
   }
 
   async function cancelBooking(id) {
     return db
-      .prepare("UPDATE bookings SET status = 'cancelled' WHERE id = ? AND status = 'confirmed' RETURNING *")
+      .prepare("UPDATE bookings SET status = 'cancelled', hold_until = NULL WHERE id = ? AND status IN ('confirmed', 'pending') RETURNING *")
       .bind(id)
       .first();
   }
@@ -167,6 +169,8 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
     cancelBooking,
     bookingByRef: (ref) => db.prepare('SELECT * FROM bookings WHERE ref = ?').bind(ref).first(),
     bookingById: (id) => db.prepare('SELECT * FROM bookings WHERE id = ?').bind(id).first(),
+    /** David saw the payment (Bit or PayBox) and approved the booking. */
+    markBookingApproved: (id) => db.prepare('UPDATE bookings SET approved_at = ? WHERE id = ?').bind(sqlTime(clock()), id).run(),
     /** The client gave up on paying: their held time is free again at once. */
     releaseBooking: async (ref, token) =>
       changed(

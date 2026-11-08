@@ -190,7 +190,7 @@ test('a confirmed booking goes into a "קליניקה" calendar, made the first 
   assert.equal(dav.calendars.get('/1/calendars/clinic-bookings/'), 'קליניקה');
   const ics = dav.puts.get(`/1/calendars/clinic-bookings/booking-${r.body.booking.ref}.ics`);
   assert.match(ics, /DTSTART:20261004T093000Z/);
-  assert.match(ics, /SUMMARY:Dana Levi – דיקור לסטרס/);
+  assert.match(ics, /SUMMARY:Dana Levi – דיקור סטרס/);
   const row = env.DB.raw.prepare('SELECT calendar_at FROM bookings WHERE ref = ?').get(r.body.booking.ref);
   assert.ok(row.calendar_at, 'marked as written to the calendar');
 });

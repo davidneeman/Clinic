@@ -13,7 +13,8 @@ The site runs on Cloudflare's free plan:
 
 `BOOKING_MODE` in `wrangler.jsonc` decides how bookings work:
 
-- `"whatsapp"` (now): exactly like the GitHub Pages site today. A booking request or a message opens WhatsApp, and nothing is stored. The free times come from the opening hours, minus the days closed in the admin panel (and, once connected, minus his calendar).
+- `"transfer"` (now): bookings are made on the site, and the client pays by Bit or PayBox to David's phone (058-434-4047): one session (350 ₪), the 4-session card (1,200 ₪, this session included), or a session from a card they already have (nothing to pay). The confirmation shows the number, the amount and the booking number to write in the transfer's note. The time is held until David approves it under **פגישות** (or the appointment time passes); approving adds the client to **לקוחות**, adds the card's other 3 sessions or takes one, and puts the booking in his calendar. The site can't see Bit or PayBox payments itself, so approving is by hand. Messages still go to WhatsApp.
+- `"whatsapp"`: exactly like the GitHub Pages site today. A booking request or a message opens WhatsApp, and nothing is stored. The free times come from the opening hours, minus the days closed in the admin panel (and, once connected, minus his calendar).
 - `"pay"`: what David chose. The client books and pays in full on the site, and messages still go to WhatsApp. See "Payment at booking" below.
 - `"online"`: bookings and messages are taken and stored on the site without payment.
 
@@ -130,7 +131,7 @@ npx wrangler secret put ICLOUD_APP_PASSWORD   # the password Apple shows, once
 
 | Name | Kind | What |
 |---|---|---|
-| `BOOKING_MODE` | `vars` in `wrangler.jsonc` | `whatsapp`, `pay` or `online` (see above) |
+| `BOOKING_MODE` | `vars` in `wrangler.jsonc` | `transfer`, `whatsapp`, `pay` or `online` (see above) |
 | `GROW_ENV` | `vars` | `sandbox` (Grow's test environment) or `production` |
 | `CALENDAR_NAME` | `vars` | The calendar bookings go into (default "קליניקה") |
 | `ACCESS_TEAM_DOMAIN` | secret, optional | `https://<team name>.cloudflareaccess.com` (only with Cloudflare Access) |

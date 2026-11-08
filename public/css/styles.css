@@ -5136,6 +5136,173 @@ html.js .reveal:not(.is-visible) {
   }
 }
 
+/* ---------- Paying by Bit or PayBox (BOOKING_MODE "transfer") ---------- */
+
+/* What the client pays for: one session, the card, or a session from their card */
+.plan-options {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 4px 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.plan-options legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.plan-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.plan-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.plan-option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.plan-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-name {
+  font-weight: 600;
+}
+
+.plan-sub,
+.plan-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.plan-note {
+  margin: 2px 0 0;
+}
+
+.plan-price {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* After saving: where to send the payment, then the booking waits for approval */
+.pay-transfer {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 4px;
+  padding: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: start;
+}
+
+.pay-to {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.pay-phone {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pay-note {
+  margin: 0;
+}
+
+.pay-note .ref {
+  font-weight: 700;
+}
+
+.pay-status {
+  margin: 14px 0 0;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.pay-status.is-done {
+  color: var(--success);
+}
+
+/* ---------- The bar for choosing the opening photo (only with ?photo) ---------- */
+.photo-chooser {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 96;
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  margin-inline: auto;
+  padding: 5px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: #221c17;
+  box-shadow: 0 16px 40px -14px rgb(0 0 0 / 0.55);
+  font: 500 0.95rem/1 var(--font-body, system-ui), sans-serif;
+}
+
+.photo-chooser button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 14px 4px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #f1e9db;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+[dir='rtl'] .photo-chooser button {
+  padding: 4px 4px 4px 14px;
+}
+
+.photo-chooser button[aria-pressed='true'] {
+  background: #f1e9db;
+  color: #221c17;
+}
+
+.photo-chooser img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+@media (max-width: 760px) {
+  .photo-chooser {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ---------- The bar for comparing the colour options (only with ?options) ---------- */
 
 .pal-switcher {
@@ -5608,6 +5775,21 @@ html.js .reveal:not(.is-visible) {
 
 .device-offer .toolbar {
   margin-bottom: 0;
+}
+
+/* Bookings paid by Bit or PayBox: what for, and those waiting for approval */
+.item-plan {
+  margin-top: 4px !important;
+}
+
+.chip-waiting {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 /* Clients and admins: rows without a date box */

@@ -10,6 +10,10 @@
 //              they pay, and the booking is confirmed only once Grow confirms the payment.
 //              Messages still go to WhatsApp.
 //   "online"   – bookings and messages are taken and stored here, without payment.
+//   "transfer" – bookings are taken here, and the client pays by Bit or PayBox to the
+//              practitioner's phone: one session, the 4-session card, or a session from a card
+//              they already have. The time is held until he sees the payment and approves the
+//              booking in the admin panel. Messages still go to WhatsApp.
 //
 // With ICLOUD_USER and ICLOUD_APP_PASSWORD set, times taken in the practitioner's iCloud
 // calendar don't show, and each confirmed booking is added to it (worker/calendar.js).
@@ -20,7 +24,7 @@ import siteConfig from '../config/site.json' with { type: 'json' };
 import { addDays, dayIndex, isValidDate, isValidTime, nowInZone } from '../server/time.js';
 import { accessSettings, verifyAccess } from './access.js';
 import { openAdminStore, phoneKey } from './admin-store.js';
-import { addBooking as addToCalendar, busyTimes, calendarSettings } from './calendar.js';
+import { addBooking as addToCalendar, busyTimes, calendarSettings, zonedToUtc } from './calendar.js';
 import {
   approveTransaction,
   createPaymentProcess,
@@ -48,7 +52,11 @@ const sessionCookie = (token, hours = SESSION_HOURS) =>
   `${SESSION_COOKIE}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${Math.round(hours * 3600)}`;
 const HOLD_MINUTES = 20; // how long a time stays held while the client pays
 const RECONCILE_HOURS = 6; // how far back the scheduled check looks for unanswered payments
-const MODES = new Set(['whatsapp', 'pay', 'online']);
+const MODES = new Set(['whatsapp', 'pay', 'online', 'transfer']);
+// What a client can pay for when paying by Bit or PayBox ("transfer").
+const PLANS = new Set(['single', 'pack', 'card']);
+/** "+972 58-434-4047" → "058-434-4047", the way people type it into Bit or PayBox. */
+const localPhone = (phone) => String(phone || '').replace(/^\+972[\s-]*/, '0');
 
 function str(v, max) {
   if (typeof v !== 'string') return '';
@@ -233,6 +241,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         // Messages go to WhatsApp unless the site takes them itself ("online").
         handoff: mode === 'online' ? undefined : 'whatsapp',
         payments: mode === 'pay' ? true : undefined,
+        // Paying by Bit or PayBox to this number, approved by hand.
+        transfer: mode === 'transfer' ? { phone: localPhone(config.business.phone) } : undefined,
       });
     }
 
@@ -257,6 +267,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       if (mode === 'whatsapp') throw notFound();
       const grow = mode === 'pay' ? growSettings(env) : null;
       if (mode === 'pay' && !grow) throw new HttpError(503, 'payments_unavailable');
+      const transfer = mode === 'transfer';
       if (await overLimit(env.FORMS_LIMIT, `${ip} bookings`)) throw tooMany();
       const b = body;
       const service = services.get(b.serviceId);
@@ -278,15 +289,21 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       if (!PHONE_RE.test(input.phone) || (grow && !israeliMobile(input.phone))) bad.push('phone');
       if (input.email && !EMAIL_RE.test(input.email)) bad.push('email');
       if (b.consent !== true) bad.push('consent');
+      const plan = transfer ? (PLANS.has(b.plan) ? b.plan : null) : null;
+      if (transfer && !plan) bad.push('plan');
       if (bad.length) throw invalid(bad);
+      // Bit or PayBox: one session, the card of sessions (this one included), or nothing now
+      // for a session from a card the client already has.
+      const price = transfer ? (plan === 'pack' ? config.prices.pack.price : plan === 'card' ? 0 : service.price) : grow ? service.price : null;
 
       const busy = await calendarBusy(env, input.date, input.date);
       let booking;
       try {
         booking = await store.createBooking(
-          { ...input, duration: service.duration, price: grow ? service.price : null },
+          { ...input, duration: service.duration, price, plan },
           now(),
-          { hold: grow ? HOLD_MINUTES : 0, busy },
+          // Paid by hand: the time stays held until David approves (or the appointment passes).
+          { hold: grow ? HOLD_MINUTES : 0, holdUntil: transfer ? zonedToUtc(input.date, input.time, tz) : null, busy },
         );
       } catch (err) {
         if (err instanceof SlotTakenError) throw new HttpError(409, 'slot_taken');
@@ -301,6 +318,10 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         name: booking.name,
         price: booking.price ?? undefined,
       };
+
+      if (transfer) {
+        return json({ booking: { ...summary, plan, price }, transfer: { phone: localPhone(config.business.phone) } }, 201);
+      }
 
       if (!grow) {
         ctx?.waitUntil?.(afterConfirmed(env, store, booking));
@@ -336,7 +357,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     }
 
     if (route === 'GET /api/bookings/status') {
-      if (mode !== 'pay') throw notFound();
+      if (mode !== 'pay' && mode !== 'transfer') throw notFound();
       const booking = await store.bookingByRef(String(url.searchParams.get('ref') || '').slice(0, 12));
       if (!booking) throw notFound();
       return json({ status: booking.status }); // only the status: no one else's details
@@ -556,7 +577,30 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       }
 
       if (route === 'GET /api/admin/bookings') {
-        return json({ bookings: await store.listBookings(url.searchParams.get('scope'), today) });
+        const bookings = await store.listBookings(url.searchParams.get('scope'), today);
+        // A session from a card: how many the client has left, to check before approving.
+        for (const b of bookings) {
+          if (b.plan === 'card' && b.status === 'pending') b.card_left = (await admins.clientByPhone(b.phone))?.card_left ?? null;
+        }
+        return json({ bookings });
+      }
+
+      // David saw the payment (or the card) and approves: the booking is confirmed, the client
+      // is in his list, a new card adds its other sessions and a card session takes one.
+      const approve = /^\/api\/admin\/bookings\/(\d{1,12})\/approve$/.exec(path);
+      if (method === 'POST' && approve) {
+        const waiting = await store.bookingById(Number(approve[1]));
+        if (!waiting) throw notFound();
+        if (!waiting.plan || !['pending', 'expired'].includes(waiting.status)) throw new HttpError(409, 'not_waiting');
+        const booking = await store.confirmBooking(waiting.id);
+        if (!booking) throw new HttpError(409, 'slot_taken');
+        await store.markBookingApproved(booking.id);
+        let cardLeft = null;
+        const clientId = await admins.clientFromBooking(booking);
+        if (clientId && booking.plan === 'pack') cardLeft = await admins.addCardSessions(clientId, config.prices.pack.sessions - 1);
+        if (clientId && booking.plan === 'card') cardLeft = await admins.addCardSessions(clientId, -1);
+        ctx?.waitUntil?.(afterConfirmed(env, store, booking)); // the calendar
+        return json({ booking, cardLeft });
       }
 
       const cancel = /^\/api\/admin\/bookings\/(\d{1,12})\/cancel$/.exec(path);

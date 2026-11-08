@@ -10,6 +10,7 @@ import {
   pick,
   showFieldErrors,
   t,
+  toast,
 } from './site.js';
 import { svg } from './icons.js';
 
@@ -257,7 +258,7 @@ function renderSummary() {
     ['book.service', s && pick(s.name)],
     ['book.date', state.date && fmtDate(state.date)],
     ['book.time', state.time],
-    s?.price != null && ['book.price', formatPrice(s.price)],
+    s?.price != null && ['book.price', viaTransfer() ? planPrice(selectedPlan()) : formatPrice(s.price)],
   ].filter(Boolean);
   $('summary').replaceChildren(
     ...rows.flatMap(([label, value]) => [
@@ -303,6 +304,25 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 // Paying on the site (Grow): the client pays on Grow's secure page and comes back here. The
 // payment company asks for a full name and an Israeli mobile number.
 const viaPayment = () => state.config?.payments === true;
+
+// Paying by Bit or PayBox to David's phone: the client picks one session, the card of
+// sessions (this one included) or a session from a card they have; the booking then waits
+// for David to see the payment and approve it.
+const viaTransfer = () => Boolean(state.config?.transfer);
+const selectedPlan = () => document.querySelector('#plan-options input[name="plan"]:checked')?.value || 'single';
+function planAmount(plan) {
+  const prices = state.config.prices;
+  return plan === 'pack' ? prices.pack.price : plan === 'card' ? 0 : (state.service?.price ?? prices.session.price);
+}
+const planPrice = (plan) => (plan === 'card' ? t('book.fromCard') : formatPrice(planAmount(plan)));
+
+function renderPlans() {
+  if (!viaTransfer()) return;
+  const { pack } = state.config.prices;
+  $('plan-pack-name').textContent = t('prices.pack', { n: pack.sessions });
+  $('plan-pack-sub').textContent = t('book.planPackSub', { n: pack.sessions - 1 });
+  for (const node of document.querySelectorAll('[data-plan-price]')) node.textContent = formatPrice(planAmount(node.dataset.planPrice));
+}
 const isFullName = (name) => name.trim().split(/\s+/).filter((w) => w.replace(/[^\p{L}\p{N}]/gu, '').length >= 2).length >= 2;
 function isMobile(phone) {
   let digits = phone.replace(/\D+/g, '');
@@ -343,22 +363,23 @@ async function submit(e) {
 
   const bad = [];
   const paying = viaPayment();
+  const transfer = viaTransfer();
   if ((data.name || '').trim().length < 2 || (paying && !isFullName(data.name))) bad.push('name');
-  if (paying || !viaWhatsApp()) {
+  if (paying || transfer || !viaWhatsApp()) {
     if (!PHONE_RE.test((data.phone || '').trim()) || (paying && !isMobile(data.phone))) bad.push('phone');
     if (data.email && !EMAIL_RE.test(data.email.trim())) bad.push('email');
   }
   if (!data.consent) bad.push('consent');
   const messages = paying ? PAY_MESSAGES : {};
   if (bad.length) return showFieldErrors(form, bad, messages);
-  if (!paying && viaWhatsApp()) return handOffToWhatsApp(data);
+  if (!paying && !transfer && viaWhatsApp()) return handOffToWhatsApp(data);
 
   const button = $('confirm-btn');
   button.disabled = true;
-  button.textContent = t(paying ? 'book.paying' : 'book.confirming');
+  button.textContent = t(paying ? 'book.paying' : transfer ? 'book.saving' : 'book.confirming');
   let leaving = false;
   try {
-    const { booking, payUrl, token } = await api('/api/bookings', {
+    const { booking, payUrl, token, transfer: payTo } = await api('/api/bookings', {
       method: 'POST',
       body: {
         serviceId: state.service.id,
@@ -370,8 +391,10 @@ async function submit(e) {
         notes: data.notes,
         consent: true,
         lang: getLang(),
+        plan: transfer ? selectedPlan() : undefined,
       },
     });
+    if (payTo) return showConfirmation(booking, false, null, payTo);
     if (payUrl) {
       // Off to Grow's page. This tab remembers the booking for when the client comes back.
       saved.set(booking.ref, { token, booking });
@@ -387,7 +410,7 @@ async function submit(e) {
       goTo(2);
       setAlert('time-alert', 'error', t('book.slotTaken'));
     } else if (err.status === 400) {
-      showFieldErrors(form, err.data.fields, messages);
+      showFieldErrors(form, (err.data.fields || []).filter((f) => f !== 'plan'), messages);
     } else {
       const key = err.status === 429 ? 'errors.rate' : paying && (err.status === 502 || err.status === 503) ? 'book.payError' : 'common.error';
       setAlert('details-alert', 'error', t(key));
@@ -456,11 +479,29 @@ let confirmed = null;
 
 function renderConfirmation() {
   if (!confirmed) return;
-  const { booking, whatsappHref } = confirmed;
+  const { booking, whatsappHref, payTo, status } = confirmed;
   const title = $('confirm-title');
-  title.dataset.i18n = whatsappHref ? 'book.waTitle' : 'book.successTitle';
+  title.dataset.i18n = payTo ? (status === 'confirmed' ? 'book.statusConfirmed' : 'book.transferTitle') : whatsappHref ? 'book.waTitle' : 'book.successTitle';
   title.textContent = t(title.dataset.i18n);
-  $('confirm-text').textContent = whatsappHref ? t('book.waText') : t('book.successText', { name: booking.name });
+  $('confirm-text').textContent = payTo
+    ? booking.plan === 'card'
+      ? t('book.transferCardText')
+      : t('book.transferText', { amount: formatPrice(booking.price) })
+    : whatsappHref
+      ? t('book.waText')
+      : t('book.successText', { name: booking.name });
+  // Bit or PayBox: where to send it, and the booking's state while David hasn't approved yet.
+  $('confirm-pay').hidden = !(payTo && booking.plan !== 'card' && status === 'pending');
+  if (payTo) {
+    $('pay-phone').textContent = payTo.phone;
+    $('pay-note').replaceChildren(t('book.payNoteBefore'), el('strong', { class: 'ref' }, booking.ref));
+    const statusKey = { confirmed: 'book.statusConfirmed', cancelled: 'book.statusCancelled', expired: 'book.statusCancelled' }[status] || 'book.statusPending';
+    $('pay-status').textContent = t(statusKey);
+    $('pay-status').classList.toggle('is-done', status === 'confirmed');
+    $('pay-status').hidden = false;
+  } else {
+    $('pay-status').hidden = true;
+  }
   $('confirm-whatsapp').hidden = !whatsappHref;
   if (whatsappHref) $('confirm-whatsapp').href = whatsappHref;
   const rows = [
@@ -469,12 +510,14 @@ function renderConfirmation() {
     ['book.date', fmtDate(booking.date)],
     ['book.time', el('bdi', {}, booking.time)],
     booking.paid && booking.price != null && ['book.paid', formatPrice(booking.price)],
+    payTo && ['book.amount', booking.plan === 'card' ? t('book.fromCard') : formatPrice(booking.price)],
   ].filter(Boolean);
   $('confirm-details').replaceChildren(...rows.flatMap(([k, v]) => [el('dt', {}, t(k)), el('dd', {}, v)]));
 }
 
-function showConfirmation(booking, emailed, whatsappHref = null) {
-  confirmed = { booking, whatsappHref };
+function showConfirmation(booking, emailed, whatsappHref = null, payTo = null) {
+  confirmed = { booking, whatsappHref, payTo, status: payTo ? 'pending' : null };
+  if (payTo) watchApproval(booking.ref);
   $('booking-flow').hidden = true;
   document.querySelector('.page-hero').hidden = true;
   $('confirmation').hidden = false;
@@ -483,6 +526,32 @@ function showConfirmation(booking, emailed, whatsappHref = null) {
   window.scrollTo({ top: 0, behavior: 'instant' });
   $('confirm-title').focus({ preventScroll: true });
 }
+
+/** While the page stays open, shows when David approves the booking (or cancels it). */
+function watchApproval(ref) {
+  let tries = 0;
+  const timer = setInterval(async () => {
+    tries++;
+    try {
+      const { status } = await api(`/api/bookings/status?ref=${encodeURIComponent(ref)}`);
+      if (status !== confirmed?.status) {
+        confirmed.status = status;
+        renderConfirmation();
+      }
+      if (status !== 'pending') clearInterval(timer);
+    } catch {}
+    if (tries >= 80) clearInterval(timer); // about 20 minutes
+  }, 15_000);
+}
+
+$('copy-phone').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(confirmed.payTo.phone.replace(/\D+/g, ''));
+    toast(t('book.copied'));
+  } catch {
+    toast(confirmed.payTo.phone);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Wiring
@@ -497,6 +566,7 @@ function renderAll() {
   }
   renderSummary();
   renderConsent();
+  renderPlans();
   renderConfirmation();
 }
 
@@ -524,6 +594,14 @@ loadConfig()
     if (viaPayment()) {
       $('confirm-btn').dataset.i18n = 'book.toPayment';
       $('confirm-btn').textContent = t('book.toPayment');
+    } else if (viaTransfer()) {
+      $('plan-options').hidden = false;
+      $('confirm-btn').dataset.i18n = 'book.saveBooking';
+      $('confirm-btn').textContent = t('book.saveBooking');
+      const wanted = new URLSearchParams(location.search).get('plan');
+      const pick = document.querySelector(`#plan-options input[value="${wanted === 'pack' || wanted === 'card' ? wanted : 'single'}"]`);
+      if (pick) pick.checked = true;
+      $('plan-options').addEventListener('change', renderSummary);
     } else if (viaWhatsApp()) {
       // The request is sent from the client's own WhatsApp, so the practitioner
       // already sees their number: no phone or email fields.
