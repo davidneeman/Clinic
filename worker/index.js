@@ -841,15 +841,23 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         return json({ schedule });
       }
 
+      // One day ({ date }) or a run of days ({ from, to }: a vacation in one go, up to a year).
       if (route === 'POST /api/admin/blocked') {
-        if (!isValidDate(body.date)) throw invalid(['date']);
-        await store.addBlocked(body.date, str(body.note, 120));
+        const from = body.from ?? body.date;
+        const to = body.to ?? from;
+        if (!isValidDate(from) || !isValidDate(to) || to < from || dayIndex(to) - dayIndex(from) >= 366) throw invalid(['date']);
+        if (from === to) await store.addBlocked(from, str(body.note, 120));
+        else await store.addBlockedRange(from, to, str(body.note, 120));
         return json({ blocked: await store.listBlocked(today) }, 201);
       }
 
-      const unblock = /^\/api\/admin\/blocked\/(\d{4}-\d{2}-\d{2})$/.exec(path);
+      const unblock = /^\/api\/admin\/blocked\/(\d{4}-\d{2}-\d{2})(?:\/(\d{4}-\d{2}-\d{2}))?$/.exec(path);
       if (method === 'DELETE' && unblock) {
-        if (!(await store.removeBlocked(unblock[1]))) throw notFound();
+        const [, from, to] = unblock;
+        if (to) {
+          if (!isValidDate(from) || !isValidDate(to) || to < from) throw invalid(['date']);
+          if (!(await store.removeBlockedRange(from, to))) throw notFound();
+        } else if (!(await store.removeBlocked(from))) throw notFound();
         return json({ blocked: await store.listBlocked(today) });
       }
 

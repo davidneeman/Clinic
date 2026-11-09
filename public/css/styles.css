@@ -6652,3 +6652,273 @@ html.js .reveal:not(.is-visible) {
 :root[data-look='2ln']:not([data-theme='dark']) {
   --danger: #9a3a2c;
 }
+
+/* ==========================================================================
+   Admin panel: picking dates and times (admin-pickers.js)
+   ========================================================================== */
+
+/* A field that shows a date in words and opens the calendar */
+.picker-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.picker-field svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+
+.picker-field.is-empty .picker-value {
+  color: var(--muted);
+}
+
+/* A run of days: the first and last day (a date never split over two lines), the number of days under */
+.nowrap {
+  white-space: nowrap;
+}
+
+.range-dates,
+.range-count {
+  display: block;
+}
+
+.range-count {
+  color: var(--muted);
+  font-size: 0.88em;
+  font-weight: 400;
+}
+
+/* (in the list of closed days the dates are words, so they read right to left as the page does) */
+#blocked-list .item-when strong {
+  direction: inherit;
+}
+
+#blocked-list .item-when small {
+  white-space: nowrap;
+}
+
+.picker-field:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.has-error .picker-field {
+  border-color: var(--danger);
+}
+
+/* Times and other choices: the phone's own list, looking like the other fields */
+.field select,
+.time-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23685a4a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 16px;
+  background-position: right 14px center;
+  padding-inline-end: 40px;
+}
+
+[dir='rtl'] :is(.field select, .time-select) {
+  background-position: left 14px center;
+}
+
+/* (the opening hours read left to right, "13:00 – 19:00", so their arrow is on the right) */
+[dir='rtl'] .range .time-select {
+  background-position: right 14px center;
+}
+
+.time-select {
+  min-height: 48px;
+  padding-block: 8px;
+  padding-inline-start: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* The calendar (opens quickly: it's opened often) */
+.picker-dialog {
+  width: min(420px, calc(100vw - 24px));
+}
+
+.picker-dialog[open] {
+  animation-duration: 0.2s;
+}
+
+.picker-dialog .dialog-inner {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.picker-dialog h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.picker-dialog .calendar-head {
+  margin-bottom: 0;
+}
+
+.picker-dialog .calendar-head h3 {
+  font-size: 1.35rem;
+}
+
+.picker-dialog .calendar-head .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+
+.picker-dialog .calendar-head .icon-btn[disabled] {
+  opacity: 0.3;
+}
+
+.picker-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* (every day that can be picked looks it; no dots as on the booking page) */
+.picker-grid .day::after {
+  display: none;
+}
+
+.picker-grid .day.in-range {
+  border-radius: 0;
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.picker-range-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-height: 1.6em;
+}
+
+.picker-status {
+  margin: 0;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.picker-dialog .panel-actions {
+  margin: 0;
+}
+
+/* The notice form: when it starts and ends */
+.when-field {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.when-field legend {
+  padding: 0 6px;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.choice input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.when-at {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 420px) {
+  .when-at {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The opening hours: the time lists side by side */
+.range .time-select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 561px) {
+  .range .time-select {
+    width: 130px;
+  }
+}
+
+/* Closed days: the days, a note, the button */
+.block-form .field:first-child {
+  flex: 2 1 240px;
+}
+
+/* A line or two at the top of each tab, saying what it's for */
+.tab-intro {
+  max-width: 70ch;
+  margin: -8px 0 18px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* Brought back from a draft (typed, not saved yet) */
+.draft-note,
+.save-restored {
+  margin: 0;
+  padding: 10px 14px;
+  border-inline-start: 3px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.save-restored {
+  margin-bottom: 8px;
+}
+
+#schedule-form .draft-note {
+  margin-block: 4px 14px;
+}

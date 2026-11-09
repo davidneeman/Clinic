@@ -466,9 +466,11 @@ test('once a day, uploads nothing uses any more are deleted (not the ones in use
   const scheduled = (iso) => createWorker({ config, clock: () => new Date(iso), log: silent }).scheduled({}, ctx.env);
   await scheduled('2026-10-02T02:05:00Z'); // a day later: too new to delete
   assert.equal(ctx.env.MEDIA.items.size, 6);
-  await scheduled('2026-10-05T11:05:00Z'); // not the hour for it
+  await scheduled('2026-10-10T02:05:00Z'); // nine days later: a draft may still use it
   assert.equal(ctx.env.MEDIA.items.size, 6);
-  await scheduled('2026-10-05T02:05:00Z');
+  await scheduled('2026-10-20T11:05:00Z'); // not the hour for it
+  assert.equal(ctx.env.MEDIA.items.size, 6);
+  await scheduled('2026-10-20T02:05:00Z');
   assert.deepEqual([...ctx.env.MEDIA.items.keys()].sort(), [`${ID}-1080`, `${ID}-1600`, `${ID}-640`]);
 });
 
@@ -500,4 +502,36 @@ test('before the database is updated (no notices table yet), the rest keeps work
   assert.deepEqual((await ctx.call('/api/config')).body.closedDays, ['2026-10-05'], '"open now" knows about it');
   // Only the notices wait for the update.
   assert.equal((await ctx.call('/api/admin/notices', { cookie: me })).status, 500);
+});
+
+test('closed days: a run of days in one go, and opened again in one go (a notice’s days stay)', async () => {
+  const ctx = setup();
+  const me = await ctx.signIn();
+  const blocked = async () => (await ctx.call('/api/admin/schedule', { cookie: me })).body.blocked.map((b) => [b.date, b.note, b.notice_id]);
+  const close = (body) => ctx.call('/api/admin/blocked', { method: 'POST', body, cookie: me });
+  assert.equal((await close({ from: '2026-10-08', to: '2026-10-06' })).status, 400, 'the last day before the first');
+  assert.equal((await close({ from: '2026-10-08', to: '2027-10-09' })).status, 400, 'more than a year');
+  assert.equal((await close({ from: '2026-10-08', to: 'tomorrow' })).status, 400);
+  assert.equal((await close({ date: '2026-10-05', note: 'יום אחד' })).status, 201, 'one day, as before');
+  assert.equal((await close({ from: '2026-10-07', to: '2026-10-10', note: 'חופשה' })).status, 201);
+  assert.deepEqual(await blocked(), [
+    ['2026-10-05', 'יום אחד', null],
+    ['2026-10-07', 'חופשה', null],
+    ['2026-10-08', 'חופשה', null],
+    ['2026-10-09', 'חופשה', null],
+    ['2026-10-10', 'חופשה', null],
+  ]);
+  const slots = async (date) => (await ctx.call(`/api/availability?service=stress&from=${date}&to=${date}`)).body.days[date];
+  assert.deepEqual(await slots('2026-10-08'), []);
+  // A notice closes a day inside the vacation too: opening the vacation leaves the notice's day.
+  await ctx.call('/api/admin/notices', { method: 'POST', body: { kind: 'alert', text: 'סגור', closeFrom: '2026-10-11', closeTo: '2026-10-12', active: true }, cookie: me });
+  assert.equal((await ctx.call('/api/admin/blocked/2026-10-07/2026-10-12', { method: 'DELETE', body: {}, cookie: me })).status, 200);
+  assert.deepEqual(await blocked(), [
+    ['2026-10-05', 'יום אחד', null],
+    ['2026-10-11', 'סגור', 1],
+    ['2026-10-12', 'סגור', 1],
+  ]);
+  assert.ok((await slots('2026-10-08')).length > 0, 'open again');
+  assert.equal((await ctx.call('/api/admin/blocked/2026-10-20/2026-10-25', { method: 'DELETE', body: {}, cookie: me })).status, 404, 'nothing closed there');
+  assert.equal((await ctx.call('/api/admin/blocked/2026-10-05', { method: 'DELETE', body: {}, cookie: me })).status, 200, 'one day, as before');
 });

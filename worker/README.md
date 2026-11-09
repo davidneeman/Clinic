@@ -126,7 +126,7 @@ David changes the site himself, from his phone:
 - **The treatments**: each one's name, description and photo, and **the prices** (a session, the card and how many sessions it has). The prices are the ones the booking page shows and asks to transfer by Bit or PayBox.
 - **The photos**: the one in the arch (the site's own, or his), the "about" photo and its description, and the gallery – its order, descriptions, and photos to replace, remove or add (up to 24).
 
-A photo he picks is framed on the phone in the shape it has on the site (the arch shows its window lines), then uploaded in the three sizes the site uses, as a new JPEG: the location and camera details in the phone's file don't go with it, and the server strips any that would. Uploads nothing uses any more are deleted after three days.
+A photo he picks is framed on the phone in the shape it has on the site (the arch shows its window lines), then uploaded in the three sizes the site uses, as a new JPEG: the location and camera details in the phone's file don't go with it, and the server strips any that would. Uploads nothing uses are deleted after two weeks (time enough to save a draft that has one).
 
 His changes are kept in D1 (`settings` → `content`, and the `notices` table) and are on the site at once: the Worker puts them into the home and booking pages as they're served (with the same security headers), and `/api/config` gives the booking page his names and prices. The GitHub Pages copy reads the same from `/api/site` (allowed for that address only) and keeps it in the browser, so it looks the same.
 

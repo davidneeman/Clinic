@@ -31,9 +31,9 @@ const AHEAD_MAX_DAYS = 731;
 // One size of one photo (D1 and KV both take more; a phone photo saved at these sizes is
 // usually 100–600 KB).
 export const MEDIA_MAX_BYTES = 1_900_000;
-// Uploads that nothing on the site uses (a photo replaced, or picked and then not saved) are
-// deleted after this long.
-const UNUSED_UPLOAD_DAYS = 3;
+// Uploads that nothing on the site uses (a photo replaced, or picked and not saved yet) are
+// deleted after this long – long enough for a draft kept in the admin panel to be saved.
+const UNUSED_UPLOAD_DAYS = 14;
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const copyRef = (ref) => (ref.builtin ? { builtin: ref.builtin } : { upload: ref.upload });

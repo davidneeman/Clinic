@@ -1,6 +1,7 @@
 import { api, clearFieldErrors, el, loadConfig, locale, onLangChange, pick, showFieldErrors, t, toast } from './site.js';
 import { svg } from './icons.js';
 import { createSiteTab } from './admin-site.js';
+import { choiceSelect, clearDraft, draftNames, draftWhen, formatRange, loadDraft, rangeDates, rangeField, rangeParts, saveDraft, shiftDays, timeSelect, todayIn } from './admin-pickers.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -103,6 +104,16 @@ async function showDashboard() {
   $('tab-clients').hidden = !state.passkeys;
   $('tab-people').hidden = !state.passkeys;
   $('tab-site').hidden = !state.editor;
+  // Back on the tab that was open last time.
+  let last = null;
+  try {
+    last = localStorage.getItem('admin-tab');
+  } catch {
+    /* private mode */
+  }
+  if (last && $(`tab-${last}`) && !$(`tab-${last}`).hidden) selectTab(last);
+  // Messages from the site go to WhatsApp unless the site takes them itself.
+  setText('messages-intro', state.config?.handoff === 'whatsapp' ? 'admin.introMessagesWhatsapp' : 'admin.introMessages');
   await Promise.all([
     loadBookings(),
     loadSchedule(),
@@ -305,6 +316,9 @@ $('login-form').addEventListener('submit', async (e) => {
 });
 
 $('logout').addEventListener('click', async () => {
+  // What's typed and not saved is kept on this device; signing out takes it off (after asking).
+  if (draftNames().length && !confirm(t('admin.logoutDrafts'))) return;
+  for (const name of draftNames()) clearDraft(name);
   const res = await api('/api/admin/logout', { method: 'POST', body: {} }).catch(() => ({}));
   if (res.redirect) return location.assign(res.redirect);
   showLogin();
@@ -314,16 +328,21 @@ $('logout').addEventListener('click', async () => {
 // Tabs
 // ---------------------------------------------------------------------------
 
-for (const tab of document.querySelectorAll('[data-tab]')) {
-  tab.addEventListener('click', () => {
-    state.tab = tab.dataset.tab;
-    for (const t2 of document.querySelectorAll('[data-tab]')) {
-      const on = t2 === tab;
-      t2.setAttribute('aria-selected', String(on));
-      $(`panel-${t2.dataset.tab}`).hidden = !on;
-    }
-  });
+/** Shows one tab (and remembers it, so the panel opens on it next time). */
+function selectTab(name) {
+  state.tab = name;
+  for (const t2 of document.querySelectorAll('[data-tab]')) {
+    const on = t2.dataset.tab === name;
+    t2.setAttribute('aria-selected', String(on));
+    $(`panel-${t2.dataset.tab}`).hidden = !on;
+  }
+  try {
+    localStorage.setItem('admin-tab', name);
+  } catch {
+    /* private mode */
+  }
 }
+for (const tab of document.querySelectorAll('[data-tab]')) tab.addEventListener('click', () => selectTab(tab.dataset.tab));
 
 // ---------------------------------------------------------------------------
 // Bookings
@@ -442,17 +461,101 @@ async function cancelBooking(b) {
 // Schedule
 // ---------------------------------------------------------------------------
 
+// The settings as plain choices (the value already set is always kept among them).
+const SETTINGS = {
+  slotInterval: {
+    choices: [10, 15, 20, 30, 45, 60, 90, 120],
+    text: (n) => (n === 60 ? t('admin.everyHour') : n === 90 ? t('admin.everyHourHalf') : n === 120 ? t('admin.everyTwoHours') : t('admin.everyN', { n })),
+  },
+  bufferMinutes: {
+    choices: [0, 5, 10, 15, 20, 30, 45, 60],
+    text: (n) => (n === 0 ? t('admin.noBreak') : n === 60 ? t('admin.oneHour') : t('admin.minutesN', { n })),
+  },
+  minNoticeHours: {
+    choices: [0, 1, 2, 3, 4, 6, 12, 24, 48, 72],
+    text: (n) =>
+      n === 0
+        ? t('admin.noNotice')
+        : n === 1
+          ? t('admin.hourBefore')
+          : n === 2
+            ? t('admin.twoHoursBefore')
+            : n === 24
+              ? t('admin.dayBefore')
+              : n === 48
+                ? t('admin.twoDaysBefore')
+                : n % 24 === 0
+                  ? t('admin.daysBefore', { n: n / 24 })
+                  : t('admin.hoursBefore', { n }),
+  },
+  maxDaysAhead: {
+    choices: [7, 14, 21, 30, 45, 60, 90, 120, 180, 365],
+    text: (n) =>
+      ({ 7: t('admin.aWeek'), 14: t('admin.twoWeeks'), 30: t('admin.aMonth'), 45: t('admin.monthHalf'), 60: t('admin.twoMonths'), 180: t('admin.halfYear'), 365: t('admin.aYear') })[n] ||
+      (n % 30 === 0 ? t('admin.monthsN', { n: n / 30 }) : n % 7 === 0 ? t('admin.weeksN', { n: n / 7 }) : t('admin.daysN', { n })),
+  },
+};
+
+/** The schedule in one shape (all seven days), to tell whether anything changed. */
+function scheduleShape(sch) {
+  return {
+    weeklyHours: Array.from({ length: 7 }, (_, d) => (sch.weeklyHours?.[d] ?? sch.weeklyHours?.[String(d)] ?? []).map((r) => [r[0], r[1]])),
+    slotInterval: Number(sch.slotInterval),
+    bufferMinutes: Number(sch.bufferMinutes),
+    minNoticeHours: Number(sch.minNoticeHours),
+    maxDaysAhead: Number(sch.maxDaysAhead),
+  };
+}
+
+function scheduleBody() {
+  const f = $('schedule-form').elements;
+  return {
+    weeklyHours: state.schedule.weeklyHours,
+    slotInterval: Number(f.slotInterval.value),
+    bufferMinutes: Number(f.bufferMinutes.value),
+    minNoticeHours: Number(f.minNoticeHours.value),
+    maxDaysAhead: Number(f.maxDaysAhead.value),
+  };
+}
+
+/** After any change to the hours or the settings: kept on this device until it's saved. */
+function scheduleChanged() {
+  if (!state.schedule) return;
+  const now = scheduleShape(scheduleBody());
+  const unsaved = JSON.stringify(now) !== JSON.stringify(state.savedSchedule);
+  if (unsaved) saveDraft('schedule', now);
+  else clearDraft('schedule');
+  const note = $('schedule-unsaved');
+  note.hidden = !unsaved;
+  note.textContent = state.scheduleRestoredAt ? t('admin.scheduleRestored', { when: draftWhen(state.scheduleRestoredAt) }) : t('admin.unsavedSchedule');
+}
+
 async function loadSchedule() {
   const data = await guarded(() => api('/api/admin/schedule'));
-  state.schedule = structuredClone(data.schedule);
+  state.savedSchedule = scheduleShape(data.schedule);
+  state.schedule = scheduleShape(data.schedule);
+  state.scheduleRestoredAt = null;
+  // Changes made here and not saved yet come back.
+  const draft = loadDraft('schedule');
+  if (draft && JSON.stringify(scheduleShape(draft.data)) !== JSON.stringify(state.savedSchedule)) {
+    state.schedule = scheduleShape(draft.data);
+    state.scheduleRestoredAt = draft.at;
+  } else if (draft) clearDraft('schedule');
   state.blocked = data.blocked;
-  const form = $('schedule-form');
-  form.elements.slotInterval.value = state.schedule.slotInterval;
-  form.elements.bufferMinutes.value = state.schedule.bufferMinutes;
-  form.elements.minNoticeHours.value = state.schedule.minNoticeHours;
-  form.elements.maxDaysAhead.value = state.schedule.maxDaysAhead;
+  renderSettings(state.schedule);
   renderHours();
   renderBlocked();
+  scheduleChanged();
+}
+
+/** The settings as choices in words (again after a language switch, keeping what's chosen). */
+function renderSettings(values) {
+  const form = $('schedule-form');
+  for (const [name, spec] of Object.entries(SETTINGS)) {
+    const fresh = choiceSelect({ name, value: values[name], choices: spec.choices.map((v) => [v, spec.text(v)]), other: spec.text });
+    form.elements[name].replaceChildren(...fresh.children);
+    form.elements[name].value = String(values[name]);
+  }
 }
 
 function renderHours() {
@@ -468,13 +571,23 @@ function renderHours() {
           'div',
           { class: 'ranges' },
           ranges.length ? '' : el('span', { class: 'closed' }, t('admin.closed')),
-          ranges.map((range, i) =>
-            el(
+          ranges.map((range, i) => {
+            const from = timeSelect({ value: range[0], step: 15, label: t('admin.rangeFrom', { day: dayName(day) }) });
+            const to = timeSelect({ value: range[1], step: 15, label: t('admin.rangeTo', { day: dayName(day) }) });
+            from.addEventListener('change', () => {
+              range[0] = from.value;
+              scheduleChanged();
+            });
+            to.addEventListener('change', () => {
+              range[1] = to.value;
+              scheduleChanged();
+            });
+            return el(
               'div',
               { class: 'range' },
-              el('input', { class: 'input', type: 'time', value: range[0], required: true, 'aria-label': `${dayName(day)} – start`, onchange: (e) => (range[0] = e.target.value) }),
-              '–',
-              el('input', { class: 'input', type: 'time', value: range[1], required: true, 'aria-label': `${dayName(day)} – end`, onchange: (e) => (range[1] = e.target.value) }),
+              from,
+              el('span', { 'aria-hidden': 'true' }, '–'),
+              to,
               el('button', {
                 type: 'button',
                 class: 'icon-btn',
@@ -484,10 +597,11 @@ function renderHours() {
                 onclick: () => {
                   ranges.splice(i, 1);
                   renderHours();
+                  scheduleChanged();
                 },
               }),
-            ),
-          ),
+            );
+          }),
           el(
             'button',
             {
@@ -498,6 +612,7 @@ function renderHours() {
                 const last = ranges.at(-1);
                 ranges.push(last ? [last[1] < '20:00' ? last[1] : '16:00', '20:00'] : ['09:00', '14:00']);
                 renderHours();
+                scheduleChanged();
               },
             },
             t('admin.addRange'),
@@ -508,21 +623,22 @@ function renderHours() {
   );
 }
 
+$('schedule-form').addEventListener('change', scheduleChanged);
+
 $('schedule-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   alertIn('schedule-alert');
-  const f = e.target.elements;
-  const body = {
-    weeklyHours: state.schedule.weeklyHours,
-    slotInterval: Number(f.slotInterval.value),
-    bufferMinutes: Number(f.bufferMinutes.value),
-    minNoticeHours: Number(f.minNoticeHours.value),
-    maxDaysAhead: Number(f.maxDaysAhead.value),
-  };
+  // Each range must end after it starts.
+  const wrong = state.schedule.weeklyHours.some?.((ranges) => ranges.some(([a, b]) => a >= b));
+  if (wrong) return alertIn('schedule-alert', 'error', t('admin.rangeOrder'));
   try {
-    const { schedule } = await api('/api/admin/schedule', { method: 'PUT', body });
-    state.schedule = structuredClone(schedule);
+    const { schedule } = await api('/api/admin/schedule', { method: 'PUT', body: scheduleBody() });
+    state.savedSchedule = scheduleShape(schedule);
+    state.schedule = scheduleShape(schedule);
+    state.scheduleRestoredAt = null;
+    clearDraft('schedule');
     renderHours();
+    scheduleChanged();
     toast(t('admin.saved'));
   } catch (err) {
     if (err.status === 401) return showLogin();
@@ -530,34 +646,62 @@ $('schedule-form').addEventListener('submit', async (e) => {
   }
 });
 
+// ---- Closed days: a run of days chosen in the calendar ----
+
+let blockDays = null;
+/** The field for the days to close (made again, keeping its days, after a language switch). */
+function blockField(again = false) {
+  if (blockDays && !again) return blockDays;
+  const today = todayIn(state.config?.timezone || 'Asia/Jerusalem');
+  const { from = '', to = '' } = blockDays?.value || {};
+  blockDays = rangeField({ id: 'block-days', from, to, placeholder: t('admin.pickDays'), title: t('admin.pickBlockTitle'), min: today, today });
+  $('block-days-slot').replaceChildren(blockDays.element);
+  return blockDays;
+}
+
+/** Days next to each other with the same note (and closed the same way) show as one line. */
+function blockedRuns(list) {
+  const runs = [];
+  for (const b of list) {
+    const last = runs.at(-1);
+    const notice = b.notice_id ?? null;
+    if (last && shiftDays(last.to, 1) === b.date && last.note === (b.note || '') && last.notice === notice) last.to = b.date;
+    else runs.push({ from: b.date, to: b.date, note: b.note || '', notice });
+  }
+  return runs;
+}
+
 function renderBlocked() {
+  blockField();
   const list = $('blocked-list');
   if (!state.blocked.length) {
     list.replaceChildren(el('p', { class: 'empty-state' }, t('admin.noBlocked')));
     return;
   }
   list.replaceChildren(
-    ...state.blocked.map((b) =>
+    ...blockedRuns(state.blocked).map((run) =>
       el(
         'div',
         { class: 'item' },
-        el('div', { class: 'item-when' }, el('small', {}, fmtDate(b.date, { weekday: 'long' })), el('strong', {}, fmtDate(b.date, { day: 'numeric', month: 'short' }))),
-        el('div', { class: 'item-body' }, el('p', {}, b.note || ''), b.notice_id ? el('p', { class: 'field-hint' }, t('admin.closedByNotice')) : ''),
+        el('div', { class: 'item-when' }, el('strong', {}, rangeDates(run.from, run.to)), el('small', {}, rangeParts(run.from, run.to).count)),
+        el('div', { class: 'item-body' }, el('p', {}, run.note), run.notice ? el('p', { class: 'field-hint' }, t('admin.closedByNotice')) : ''),
         el(
           'div',
           { class: 'item-actions' },
-          // A day a notice closed opens again with the notice (the "האתר" tab), not here.
-          b.notice_id
+          // Days a notice closed open again with the notice (the "האתר" tab), not here.
+          run.notice
             ? ''
             : el('button', {
                 type: 'button',
                 class: 'btn btn-danger btn-sm',
                 onclick: async () => {
-                  const data = await guarded(() => api(`/api/admin/blocked/${b.date}`, { method: 'DELETE', body: {} }));
+                  if (run.from !== run.to && !confirm(t('admin.openDaysConfirm', { days: formatRange(run.from, run.to) }))) return;
+                  const path = run.from === run.to ? run.from : `${run.from}/${run.to}`;
+                  const data = await guarded(() => api(`/api/admin/blocked/${path}`, { method: 'DELETE', body: {} }));
                   state.blocked = data.blocked;
                   renderBlocked();
                 },
-              }, t('admin.remove')),
+              }, t('admin.openDays')),
         ),
       ),
     ),
@@ -566,12 +710,18 @@ function renderBlocked() {
 
 $('block-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const f = e.target.elements;
-  if (!f.date.value) return f.date.focus();
-  const data = await guarded(() => api('/api/admin/blocked', { method: 'POST', body: { date: f.date.value, note: f.note.value } }));
+  alertIn('block-alert');
+  const { from, to } = blockField().value;
+  if (!from) {
+    alertIn('block-alert', 'error', t('admin.pickDaysFirst'));
+    return blockField().element.focus();
+  }
+  const data = await guarded(() => api('/api/admin/blocked', { method: 'POST', body: { from, to: to || from, note: $('block-note').value } }));
   state.blocked = data.blocked;
-  e.target.reset();
+  blockField().value = {};
+  $('block-note').value = '';
   renderBlocked();
+  toast(t('admin.daysClosed'));
 });
 
 // ---------------------------------------------------------------------------
@@ -777,6 +927,29 @@ async function openClient(id) {
         : el('p', { class: 'empty-state' }, t('admin.noHistory'))
       : '',
   );
+  // What's typed and not saved is kept on this device (until it's saved, or he starts over).
+  const key = `client:${id || 'new'}`;
+  const original = Object.fromEntries(new FormData(form));
+  const draft = loadDraft(key);
+  const restart = el('button', { type: 'button', class: 'linklike' }, t('admin.startOver'));
+  const draftNote = el('p', { class: 'draft-note', hidden: true }, `${t('admin.draftRestored', { when: draft ? draftWhen(draft.at) : '' })} · `, restart);
+  form.querySelector('h2').after(draftNote);
+  if (draft && JSON.stringify(draft.data) !== JSON.stringify(original)) {
+    for (const [name, value] of Object.entries(draft.data)) if (form.elements[name]) form.elements[name].value = value;
+    draftNote.hidden = false;
+  } else if (draft) clearDraft(key);
+  restart.addEventListener('click', () => {
+    clearDraft(key);
+    for (const [name, value] of Object.entries(original)) if (form.elements[name]) form.elements[name].value = value;
+    draftNote.hidden = true;
+  });
+  const keep = () => {
+    const now = Object.fromEntries(new FormData(form));
+    if (JSON.stringify(now) === JSON.stringify(original)) clearDraft(key);
+    else saveDraft(key, now);
+  };
+  form.addEventListener('input', keep);
+  form.addEventListener('click', (e) => e.target.closest('.card-row button') && setTimeout(keep));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearFieldErrors(form);
@@ -785,6 +958,7 @@ async function openClient(id) {
     const body = { name: data.name, phone: data.phone, email: data.email, notes: data.notes, cardLeft: Number(data.cardLeft) || 0 };
     try {
       await api(id ? `/api/admin/clients/${id}` : '/api/admin/clients', { method: id ? 'PUT' : 'POST', body });
+      clearDraft(key);
       toast(t('admin.saved'));
       closeClient();
       loadClients();
@@ -904,10 +1078,15 @@ $('invite-form').addEventListener('submit', async (e) => {
 onLangChange(() => {
   if ($('dashboard').hidden) return;
   renderBookings();
-  if (state.schedule) renderHours();
+  if (state.schedule) {
+    renderSettings(scheduleBody());
+    renderHours();
+    blockField(true);
+    scheduleChanged();
+  }
   renderBlocked();
   renderMessages();
-  siteTab.render();
+  siteTab.render({ again: true });
 });
 
 Promise.all([loadConfig().catch(() => null), api('/api/admin/session')])

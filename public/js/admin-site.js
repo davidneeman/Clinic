@@ -9,6 +9,7 @@
 
 import { api, el, locale, pick, pristineHebrew, t, toast } from './site.js';
 import { svg } from './icons.js';
+import { clearDraft, dateField, draftWhen, loadDraft, rangeField, saveDraft, shiftDays, timeSelect, todayIn } from './admin-pickers.js';
 import {
   BUILTIN_PHOTOS,
   CONTENT_SECTIONS,
@@ -54,8 +55,54 @@ function grow(box) {
   box.style.height = `${Math.min(box.scrollHeight + 2, Math.max(160, window.innerHeight * 0.6))}px`;
 }
 
-const todayIn = (timeZone) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-const addDays = (date, n) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** The parts of the editor that were open last time. */
+function readOpen() {
+  try {
+    const list = JSON.parse(localStorage.getItem('admin-open') || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+function keepOpen(set) {
+  try {
+    localStorage.setItem('admin-open', JSON.stringify([...set]));
+  } catch {
+    /* private mode */
+  }
+}
+
+/**
+ * The content with his unsaved changes on top (a draft is kept as the changes only, so what
+ * someone else saved meanwhile in other parts stays).
+ */
+function withChanges(base, p) {
+  const next = structuredClone(base || {});
+  for (const [k, v] of Object.entries(p?.texts || {})) {
+    if (v === null) delete next.texts?.[k];
+    else (next.texts ??= {})[k] = v;
+  }
+  for (const [id, change] of Object.entries(p?.services || {})) {
+    const mine = { ...(next.services?.[id] || {}) };
+    for (const [k, v] of Object.entries(change || {})) {
+      if (v === null) delete mine[k];
+      else mine[k] = v;
+    }
+    if (Object.keys(mine).length) (next.services ??= {})[id] = mine;
+    else delete next.services?.[id];
+  }
+  for (const [slot, ref] of Object.entries(p?.photos || {})) {
+    if (ref === null) delete next.photos?.[slot];
+    else (next.photos ??= {})[slot] = ref;
+  }
+  for (const key of ['aboutAlt', 'gallery', 'prices']) {
+    if (!(key in (p || {}))) continue;
+    if (p[key] === null) delete next[key];
+    else next[key] = p[key];
+  }
+  return next;
+}
 
 /** A random id for an uploaded photo (16 letters and digits, as the server expects). */
 function uploadId() {
@@ -73,7 +120,7 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     notices: [],
     editing: null, // the notice being edited (or {} for a new one)
     previews: new Map(), // upload id → a local preview (blob: URL) of the photo just uploaded
-    open: new Set(), // the parts of the editor that are open
+    open: new Set(readOpen()), // the parts of the editor that are open (remembered on this device)
     errors: new Set(), // fields the server refused
     saving: false,
   };
@@ -96,6 +143,15 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     ]);
     s.saved = content.content || {};
     s.work = structuredClone(s.saved);
+    // Changes made here and not saved yet (the page was closed, or the sign-in ran out) come back.
+    const draft = loadDraft('site');
+    s.restoredAt = null;
+    if (draft) {
+      s.work = withChanges(s.saved, draft.data);
+      tidy();
+      if (dirty()) s.restoredAt = draft.at;
+      else clearDraft('site');
+    }
     s.defaults = content.defaults;
     s.media = Boolean(content.media);
     s.notices = notices?.notices || [];
@@ -104,8 +160,10 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     render();
   }
 
-  function render() {
+  /** `again`: after a language switch an open notice form is made again too (what's typed comes back from its draft). */
+  function render({ again = false } = {}) {
     if (!s.loaded) return;
+    if (again) $('notice-editor').dataset.for = '';
     renderNotices();
     renderEditor();
     renderSaveBar();
@@ -236,79 +294,132 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
       box.replaceChildren();
       return;
     }
-    if (box.firstChild && box.dataset.for === String(s.editing.id ?? 'new')) return; // already open
-    box.dataset.for = String(s.editing.id ?? 'new');
+    const key = `notice:${s.editing.id ?? 'new'}`;
+    if (box.firstChild && box.dataset.for === key) return; // already open
+    box.dataset.for = key;
     const n = s.editing;
-    const kinds = ['info', 'news', 'alert'];
     const today = todayIn(tz());
+    const startAt = localInput(n.starts_at, tz());
+    const endAt = localInput(n.ends_at, tz());
+    // The form as the notice is saved – or, if something was typed and not saved, as it was left.
+    const saved = {
+      kind: n.kind || 'info',
+      text: n.text || '',
+      startMode: startAt ? 'at' : 'now',
+      startDate: startAt.slice(0, 10) || today,
+      startTime: startAt.slice(11) || '00:00',
+      endMode: endAt ? 'at' : 'off',
+      endDate: endAt.slice(0, 10) || shiftDays(today, 7),
+      endTime: endAt.slice(11) || '23:59',
+      closing: Boolean(n.close_from),
+      closeFrom: n.close_from || '',
+      closeTo: n.close_to || '',
+    };
+    const draft = loadDraft(key);
+    const f = draft && !same({ ...saved, ...draft.data }, saved) ? { ...saved, ...draft.data } : saved;
+
     const form = el('form', { class: 'form panel notice-form', novalidate: true });
     const preview = el('div', { class: 'notice-preview-box' });
+    const radio = (name, value, checked, label) =>
+      el('label', { class: 'choice' }, el('input', { type: 'radio', name, value, checked }), el('span', {}, t(label)));
     const kindField = el(
       'fieldset',
       { class: 'kind-options' },
       el('legend', {}, t('admin.noticeKind')),
-      kinds.map((k) =>
+      ['info', 'news', 'alert'].map((k) =>
         el(
           'label',
           { class: 'kind-option' },
-          el('input', { type: 'radio', name: 'kind', value: k, checked: (n.kind || 'info') === k }),
+          el('input', { type: 'radio', name: 'kind', value: k, checked: f.kind === k }),
           el('span', { class: 'kind-icon', 'aria-hidden': 'true', html: svg({ info: 'info', news: 'sparkle', alert: 'alert' }[k]) }),
           el('span', { class: 'kind-text' }, el('strong', {}, t(`admin.kind_${k}`)), el('small', {}, t(`admin.kind_${k}_sub`))),
         ),
       ),
     );
-    const text = el('textarea', { id: 'n-text', name: 'text', rows: 3, maxlength: 280, required: true }, n.text || '');
+    const text = el('textarea', { id: 'n-text', name: 'text', rows: 3, maxlength: 280, required: true }, f.text);
     const counter = el('span', { class: 'char-count', 'aria-live': 'polite' });
-    const when = (name, label, hint, value) =>
-      el(
-        'div',
-        { class: 'field' },
-        el('label', { for: `n-${name}` }, t(label)),
-        el(
-          'div',
-          { class: 'input-row' },
-          el('input', { id: `n-${name}`, name, type: 'datetime-local', value }),
-          el(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-ghost btn-sm',
-              onclick: (e) => {
-                e.currentTarget.previousElementSibling.value = '';
-                sync();
-              },
-            },
-            t('admin.clear'),
-          ),
-        ),
-        el('small', { class: 'field-hint' }, t(hint)),
-      );
-    const closing = el('input', { type: 'checkbox', name: 'closing', checked: Boolean(n.close_from) });
-    const closeFrom = el('input', { id: 'n-closeFrom', name: 'closeFrom', type: 'date', value: n.close_from || '', min: n.close_from && n.close_from < today ? n.close_from : today });
-    const closeTo = el('input', { id: 'n-closeTo', name: 'closeTo', type: 'date', value: n.close_to || '', min: n.close_from && n.close_from < today ? n.close_from : today });
+
+    // When it shows: from now or from a day and time; until it's turned off or until a day and time.
+    const startDate = dateField({
+      id: 'n-start-date',
+      value: f.startDate,
+      title: t('admin.pickStartTitle'),
+      min: saved.startDate < today ? saved.startDate : today,
+      today,
+      quick: [
+        { label: t('admin.today'), date: today },
+        { label: t('admin.tomorrow'), date: shiftDays(today, 1) },
+      ],
+      onChange: sync,
+    });
+    const startTime = timeSelect({ id: 'n-start-time', value: f.startTime, labels: { '00:00': t('admin.dayStart') }, label: t('admin.startTime') });
+    const endDate = dateField({
+      id: 'n-end-date',
+      value: f.endDate,
+      title: t('admin.pickEndTitle'),
+      min: () => (form.elements.startMode.value === 'at' ? startDate.value : today),
+      today,
+      quick: [
+        { label: t('admin.tomorrow'), date: shiftDays(today, 1) },
+        { label: t('admin.inAWeek'), date: shiftDays(today, 7) },
+      ],
+      onChange: sync,
+    });
+    const endTime = timeSelect({ id: 'n-end-time', value: f.endTime, labels: { '23:59': t('admin.dayEnd') }, label: t('admin.endTime') });
+    const startAtBox = el('div', { class: 'when-at' }, startDate.element, startTime);
+    const endAtBox = el('div', { class: 'when-at' }, endDate.element, endTime);
+    const whenStart = el(
+      'fieldset',
+      { class: 'when-field' },
+      el('legend', {}, t('admin.noticeStartLegend')),
+      radio('startMode', 'now', f.startMode === 'now', 'admin.startNow'),
+      radio('startMode', 'at', f.startMode === 'at', 'admin.startAt'),
+      startAtBox,
+    );
+    const whenEnd = el(
+      'fieldset',
+      { class: 'when-field' },
+      el('legend', {}, t('admin.noticeEndLegend')),
+      radio('endMode', 'off', f.endMode === 'off', 'admin.endOff'),
+      radio('endMode', 'at', f.endMode === 'at', 'admin.endAt'),
+      endAtBox,
+    );
+
+    // Closing the booking calendar on some days, chosen as a run of days.
+    const closing = el('input', { type: 'checkbox', name: 'closing', checked: f.closing });
+    const closeDays = rangeField({
+      id: 'n-close-days',
+      from: f.closeFrom,
+      to: f.closeTo,
+      placeholder: t('admin.pickDays'),
+      title: t('admin.pickCloseTitle'),
+      min: saved.closeFrom && saved.closeFrom < today ? saved.closeFrom : today,
+      today,
+      onChange: sync,
+    });
     const closeBox = el(
       'div',
       { class: 'close-days' },
-      el(
-        'div',
-        { class: 'form-row' },
-        el('div', { class: 'field' }, el('label', { for: 'n-closeFrom' }, t('admin.noticeCloseFrom')), closeFrom),
-        el('div', { class: 'field' }, el('label', { for: 'n-closeTo' }, t('admin.noticeCloseTo')), closeTo),
-      ),
+      el('div', { class: 'field' }, el('label', { for: 'n-close-days' }, t('admin.noticeCloseDays')), closeDays.element),
       el('p', { class: 'field-hint' }, t('admin.noticeCloseHint')),
     );
+
+    const restart = el('button', { type: 'button', class: 'linklike' }, t('admin.startOver'));
+    const draftNote = el('p', { class: 'draft-note' }, `${t('admin.draftRestored', { when: draft ? draftWhen(draft.at) : '' })} · `, restart);
+    draftNote.hidden = f === saved;
+    restart.addEventListener('click', () => {
+      clearDraft(key);
+      box.dataset.for = '';
+      renderNoticeEditor();
+    });
     const alert = el('div', { role: 'status' });
     form.append(
       el('h3', { class: 'subhead' }, t(n.id ? 'admin.noticeEdit' : 'admin.noticeAdd')),
+      draftNote,
       kindField,
       el('div', { class: 'field' }, el('label', { for: 'n-text' }, t('admin.noticeText')), text, counter),
-      el('h4', { class: 'minihead' }, t('admin.noticeWhen')),
-      el(
-        'div',
-        { class: 'form-row' },
-        when('startsAt', 'admin.noticeFrom', 'admin.noticeFromHint', localInput(n.starts_at, tz())),
-        when('endsAt', 'admin.noticeUntil', 'admin.noticeUntilHint', localInput(n.ends_at, tz())),
-      ),
+      whenStart,
+      whenEnd,
       el('label', { class: 'checkbox' }, closing, el('span', {}, t('admin.noticeClose'))),
       closeBox,
       el('h4', { class: 'minihead' }, t('admin.noticePreview')),
@@ -331,58 +442,87 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
           t('admin.close'),
         ),
       ),
+      el('p', { class: 'field-hint' }, t('admin.draftKept')),
     );
 
+    /** What the form says now, in the same shape as `saved`. */
+    const read = () => ({
+      kind: form.elements.kind.value || 'info',
+      text: text.value,
+      startMode: form.elements.startMode.value,
+      startDate: startDate.value,
+      startTime: startTime.value,
+      endMode: form.elements.endMode.value,
+      endDate: endDate.value,
+      endTime: endTime.value,
+      closing: closing.checked,
+      closeFrom: closeDays.value.from,
+      closeTo: closeDays.value.to,
+    });
+
     function sync() {
-      const kind = form.elements.kind.value || 'info';
-      preview.replaceChildren(noticePreview(kind, text.value.trim()));
-      counter.textContent = `${count(text.value)}/280`;
-      closeBox.hidden = !closing.checked;
+      const now = read();
+      preview.replaceChildren(noticePreview(now.kind, now.text.trim()));
+      counter.textContent = `${count(now.text)}/280`;
+      startAtBox.hidden = now.startMode !== 'at';
+      endAtBox.hidden = now.endMode !== 'at';
+      closeBox.hidden = !now.closing;
+      // Kept on this device until it's saved (or he starts over).
+      if (same(now, saved)) clearDraft(key);
+      else saveDraft(key, now);
     }
     form.addEventListener('input', sync);
     form.addEventListener('change', sync);
     closing.addEventListener('change', () => {
-      // A first guess: from today (or when the notice starts) for a week, or until it ends.
-      if (closing.checked && !closeFrom.value) {
-        const start = form.elements.startsAt.value.slice(0, 10) || today;
-        closeFrom.value = start;
-        closeTo.value = form.elements.endsAt.value.slice(0, 10) || addDays(start, 6);
+      // A first guess: from when the notice starts (or today) for a week, or until it ends.
+      if (closing.checked && !closeDays.value.from) {
+        const now = read();
+        const from = now.startMode === 'at' ? now.startDate : today;
+        const to = now.endMode === 'at' && now.endDate >= from ? now.endDate : shiftDays(from, 6);
+        closeDays.value = { from, to };
+        sync();
       }
     });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       alert.replaceChildren();
-      for (const f of form.querySelectorAll('.has-error')) f.classList.remove('has-error');
+      for (const x of form.querySelectorAll('.has-error')) x.classList.remove('has-error');
+      const now = read();
       const body = {
-        kind: form.elements.kind.value,
-        text: text.value,
-        startsAt: form.elements.startsAt.value,
-        endsAt: form.elements.endsAt.value,
-        closeFrom: closing.checked ? closeFrom.value : '',
-        closeTo: closing.checked ? closeTo.value : '',
+        kind: now.kind,
+        text: now.text,
+        startsAt: now.startMode === 'at' ? `${now.startDate}T${now.startTime}` : '',
+        endsAt: now.endMode === 'at' ? `${now.endDate}T${now.endTime}` : '',
+        closeFrom: now.closing ? now.closeFrom : '',
+        closeTo: now.closing ? now.closeTo : '',
         active: n.id ? Boolean(n.active) : true,
       };
       const problems = [];
-      if (count(body.text.trim()) < 2) problems.push(['text', 'admin.noticeTextNeeded']);
-      if (body.startsAt && body.endsAt && body.endsAt <= body.startsAt) problems.push(['endsAt', 'admin.noticeEndInvalid']);
-      if (closing.checked && (!body.closeFrom || !body.closeTo || body.closeTo < body.closeFrom)) problems.push(['closeTo', 'admin.noticeCloseInvalid']);
+      if (count(body.text.trim()) < 2) problems.push([text, 'admin.noticeTextNeeded']);
+      if (body.startsAt && body.endsAt && body.endsAt <= body.startsAt) problems.push([endDate.element, 'admin.noticeEndInvalid']);
+      else if (body.endsAt && body.endsAt <= localInput(new Date().toISOString(), tz()) && body.endsAt !== `${saved.endDate}T${saved.endTime}`) {
+        problems.push([endDate.element, 'admin.noticeEndPast']);
+      }
+      if (now.closing && !(body.closeFrom && body.closeTo)) problems.push([closeDays.element, 'admin.noticeCloseInvalid']);
       const show = (list) => {
-        for (const [name] of list) form.elements[name]?.closest('.field')?.classList.add('has-error');
-        alert.replaceChildren(el('p', { class: 'alert alert-error' }, list.map(([, key]) => t(key)).join(' ')));
-        form.elements[list[0][0]]?.focus();
+        for (const [field] of list) field?.closest('.field, .when-field, .close-days')?.classList.add('has-error');
+        alert.replaceChildren(el('p', { class: 'alert alert-error' }, list.map(([, k]) => t(k)).join(' ')));
+        list[0][0]?.focus();
       };
       if (problems.length) return show(problems);
       const button = form.querySelector('[type="submit"]');
       button.disabled = true;
       try {
         await guarded(() => api(n.id ? `/api/admin/notices/${n.id}` : '/api/admin/notices', { method: n.id ? 'PUT' : 'POST', body }));
+        clearDraft(key);
         s.editing = null;
         toast(t('admin.noticeSaved'));
         await reloadNotices();
       } catch (err) {
         if (err.status === 400) {
-          const map = { text: 'admin.noticeTextNeeded', startsAt: 'admin.noticeWhenInvalid', endsAt: 'admin.noticeEndInvalid', closeFrom: 'admin.noticeCloseInvalid', closeTo: 'admin.noticeCloseInvalid', kind: 'admin.invalid' };
-          show((err.data?.fields || ['kind']).map((f) => [f, map[f] || 'admin.invalid']));
+          const fields = { text, startsAt: startDate.element, endsAt: endDate.element, closeFrom: closeDays.element, closeTo: closeDays.element };
+          const keys = { text: 'admin.noticeTextNeeded', startsAt: 'admin.noticeWhenInvalid', endsAt: 'admin.noticeEndInvalid', closeFrom: 'admin.noticeCloseInvalid', closeTo: 'admin.noticeCloseInvalid' };
+          show((err.data?.fields || ['kind']).map((x) => [fields[x], keys[x] || 'admin.invalid']));
         } else if (err.status !== 401) alert.replaceChildren(el('p', { class: 'alert alert-error' }, t('common.error')));
       } finally {
         button.disabled = false;
@@ -405,6 +545,9 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     const on = dirty();
     $('save-bar').hidden = !on;
     document.body.classList.toggle('has-save-bar', on);
+    const note = $('save-restored');
+    note.hidden = !(on && s.restoredAt);
+    if (on && s.restoredAt) note.textContent = t('admin.siteDraftRestored', { when: draftWhen(s.restoredAt) });
   }
   window.addEventListener('beforeunload', (e) => {
     if (s.loaded && dirty()) {
@@ -425,6 +568,12 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
   }
   function changed() {
     tidy();
+    // Kept on this device until it's saved, so closing the page loses nothing.
+    if (dirty()) saveDraft('site', patch());
+    else {
+      clearDraft('site');
+      s.restoredAt = null;
+    }
     renderSaveBar();
   }
 
@@ -453,6 +602,7 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
             s.open.add(section.id);
             details.querySelectorAll('textarea[data-grow]').forEach(grow);
           } else s.open.delete(section.id);
+          keepOpen(s.open);
         });
         return details;
       }),
@@ -960,6 +1110,8 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
       s.saved = content;
       s.work = structuredClone(content);
       s.errors.clear();
+      clearDraft('site');
+      s.restoredAt = null;
       toast(t('admin.contentSaved'));
       render();
     } catch (err) {
@@ -983,6 +1135,8 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     if (!confirm(t('admin.discardConfirm'))) return;
     s.work = structuredClone(s.saved);
     s.errors.clear();
+    clearDraft('site');
+    s.restoredAt = null;
     $('save-alert').replaceChildren();
     render();
   });

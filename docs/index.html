@@ -6710,6 +6710,276 @@ html.js .reveal:not(.is-visible) {
   --danger: #9a3a2c;
 }
 
+/* ==========================================================================
+   Admin panel: picking dates and times (admin-pickers.js)
+   ========================================================================== */
+
+/* A field that shows a date in words and opens the calendar */
+.picker-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.picker-field svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+
+.picker-field.is-empty .picker-value {
+  color: var(--muted);
+}
+
+/* A run of days: the first and last day (a date never split over two lines), the number of days under */
+.nowrap {
+  white-space: nowrap;
+}
+
+.range-dates,
+.range-count {
+  display: block;
+}
+
+.range-count {
+  color: var(--muted);
+  font-size: 0.88em;
+  font-weight: 400;
+}
+
+/* (in the list of closed days the dates are words, so they read right to left as the page does) */
+#blocked-list .item-when strong {
+  direction: inherit;
+}
+
+#blocked-list .item-when small {
+  white-space: nowrap;
+}
+
+.picker-field:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.has-error .picker-field {
+  border-color: var(--danger);
+}
+
+/* Times and other choices: the phone's own list, looking like the other fields */
+.field select,
+.time-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23685a4a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 16px;
+  background-position: right 14px center;
+  padding-inline-end: 40px;
+}
+
+[dir='rtl'] :is(.field select, .time-select) {
+  background-position: left 14px center;
+}
+
+/* (the opening hours read left to right, "13:00 – 19:00", so their arrow is on the right) */
+[dir='rtl'] .range .time-select {
+  background-position: right 14px center;
+}
+
+.time-select {
+  min-height: 48px;
+  padding-block: 8px;
+  padding-inline-start: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* The calendar (opens quickly: it's opened often) */
+.picker-dialog {
+  width: min(420px, calc(100vw - 24px));
+}
+
+.picker-dialog[open] {
+  animation-duration: 0.2s;
+}
+
+.picker-dialog .dialog-inner {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.picker-dialog h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.picker-dialog .calendar-head {
+  margin-bottom: 0;
+}
+
+.picker-dialog .calendar-head h3 {
+  font-size: 1.35rem;
+}
+
+.picker-dialog .calendar-head .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+
+.picker-dialog .calendar-head .icon-btn[disabled] {
+  opacity: 0.3;
+}
+
+.picker-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* (every day that can be picked looks it; no dots as on the booking page) */
+.picker-grid .day::after {
+  display: none;
+}
+
+.picker-grid .day.in-range {
+  border-radius: 0;
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.picker-range-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-height: 1.6em;
+}
+
+.picker-status {
+  margin: 0;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.picker-dialog .panel-actions {
+  margin: 0;
+}
+
+/* The notice form: when it starts and ends */
+.when-field {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-width: 0;
+}
+
+.when-field legend {
+  padding: 0 6px;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.choice input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.when-at {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+@media (max-width: 420px) {
+  .when-at {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The opening hours: the time lists side by side */
+.range .time-select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 561px) {
+  .range .time-select {
+    width: 130px;
+  }
+}
+
+/* Closed days: the days, a note, the button */
+.block-form .field:first-child {
+  flex: 2 1 240px;
+}
+
+/* A line or two at the top of each tab, saying what it's for */
+.tab-intro {
+  max-width: 70ch;
+  margin: -8px 0 18px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* Brought back from a draft (typed, not saved yet) */
+.draft-note,
+.save-restored {
+  margin: 0;
+  padding: 10px 14px;
+  border-inline-start: 3px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.save-restored {
+  margin-bottom: 8px;
+}
+
+#schedule-form .draft-note {
+  margin-block: 4px 14px;
+}
+
   </style>
 </head>
 <body data-title-key="meta.homeTitle">
@@ -7411,22 +7681,21 @@ const dictionaries = {
       cancelConfirm: 'לבטל את הפגישה של {name}?',
       cancelledToast: 'הפגישה בוטלה',
       weeklyHours: 'שעות פעילות שבועיות',
-      weeklyHoursSub: 'הגדירו טווחי שעות לכל יום. יום ללא טווחים הוא יום סגור.',
+      weeklyHoursSub: 'באילו ימים ושעות אפשר לקבוע טיפול. יום בלי שעות הוא יום סגור. אחרי שינוי לוחצים ״שמירה״ למטה.',
       closed: 'סגור',
       addRange: 'הוספת טווח',
       removeRange: 'הסרת טווח',
-      slotInterval: 'מרווח בין מועדים (דקות)',
-      bufferMinutes: 'הפסקה בין פגישות (דקות)',
-      minNoticeHours: 'התראה מינימלית (שעות)',
-      maxDaysAhead: 'אפשר לקבוע עד (ימים קדימה)',
+      slotInterval: 'כל כמה זמן אפשר להתחיל טיפול',
+      bufferMinutes: 'הפסקה בין טיפולים',
+      minNoticeHours: 'כמה זמן מראש אפשר לקבוע',
+      maxDaysAhead: 'כמה רחוק קדימה אפשר לקבוע',
       save: 'שמירה',
       saved: 'נשמר',
-      blocked: 'ימים חסומים',
-      blockedSub: 'חופשות, חגים וימים שבהם לא תהיה זמינות.',
-      blockDate: 'תאריך',
+      blocked: 'ימים סגורים',
+      blockedSub: 'חופשה, חג או ימים בלי טיפולים: בוחרים את הימים, והם נסגרים לקביעת תורים עד שפותחים אותם שוב.',
       blockNote: 'הערה',
-      block: 'חסימת יום',
-      noBlocked: 'אין ימים חסומים.',
+      block: 'סגירת הימים',
+      noBlocked: 'אין ימים סגורים.',
       remove: 'הסרה',
       noMessages: 'אין הודעות.',
       markRead: 'סימון כנקרא',
@@ -7538,15 +7807,7 @@ const dictionaries = {
       kind_alert: 'חשוב',
       kind_alert_sub: 'למשל סגירה זמנית – מופיעה תמיד, בלי כפתור סגירה',
       noticeText: 'הטקסט',
-      noticeWhen: 'מתי היא מופיעה',
-      noticeFrom: 'התחלה',
-      noticeFromHint: 'ריק – מעכשיו',
-      noticeUntil: 'סיום',
-      noticeUntilHint: 'ריק – עד שמכבים אותה',
-      clear: 'ניקוי',
       noticeClose: 'לסגור את היומן להזמנות בימים האלה',
-      noticeCloseFrom: 'מיום',
-      noticeCloseTo: 'עד יום (כולל)',
       noticeCloseHint: 'תורים שכבר נקבעו בימים האלה נשארים – כדאי לבדוק בלשונית ״פגישות״. הימים מופיעים גם ב״יומן״, ונפתחים שוב כשמשהים או מוחקים את ההודעה.',
       noticePreview: 'כך זה ייראה באתר',
       noticeSaved: 'ההודעה נשמרה',
@@ -7570,7 +7831,7 @@ const dictionaries = {
       edit: 'עריכה',
       closedByNotice: 'נסגר בהודעה באתר (וייפתח איתה)',
       contentTitle: 'תוכן האתר',
-      contentSub: 'הטקסטים, הציטוט, המחירים והתמונות. פותחים חלק, משנים ולוחצים ״שמירה״ – השינוי מופיע באתר מיד.',
+      contentSub: 'הטקסטים, הציטוט, המחירים והתמונות. פותחים חלק, משנים ולוחצים ״שמירה״ – השינוי מופיע באתר מיד. מה שעוד לא נשמר נשאר במכשיר, גם אם סוגרים את הדף.',
       changedHere: 'שונה',
       unsaved: 'יש שינויים שלא נשמרו',
       discard: 'ביטול השינויים',
@@ -7618,6 +7879,82 @@ const dictionaries = {
       uploadFailed: 'ההעלאה לא הצליחה. אפשר לנסות שוב.',
       photoUnreadable: 'אי אפשר לפתוח את הקובץ הזה כתמונה. אפשר לנסות תמונה אחרת.',
       photoSmall: 'התמונה קטנה, ועלולה להיראות מטושטשת במסכים גדולים.',
+      // Date and time pickers, drafts, and the tabs' explanations
+      introBookings: 'כל התורים שנקבעו באתר. תור שמחכה לתשלום מסומן ״ממתין לתשלום״: כשרואים את ההעברה בביט או בפייבוקס, לוחצים ״אישור תשלום״ והתור מאושר. ״ביטול פגישה״ משחרר את השעה לאחרים.',
+      introClients: 'כל מי שקבע תור נשמר כאן לבד. אפשר לחפש, להוסיף לקוח, לכתוב הערות (רק בניהול רואים אותן) ולעדכן כמה מפגשים נשארו בכרטיסייה.',
+      introMessages: 'הודעות שנשלחו מטופס ״יצירת קשר״ באתר.',
+      introMessagesWhatsapp: 'כרגע הטופס ״יצירת קשר״ באתר שולח את ההודעות ישר לוואטסאפ, אז הן לא מגיעות לכאן.',
+      slotIntervalHint: 'למשל ״כל 30 דקות״: 10:00, 10:30, 11:00…',
+      bufferMinutesHint: 'זמן פנוי אחרי כל טיפול, לפני שאפשר לקבוע את הבא.',
+      minNoticeHoursHint: 'למשל ״3 שעות לפני״: בשעה 9:00 אפשר לקבוע רק מ־12:00 והלאה.',
+      maxDaysAheadHint: 'עד מתי ביומן לקוחות רואים תורים פנויים.',
+      unsavedSchedule: 'יש שינויים שעוד לא נשמרו – לוחצים ״שמירה״.',
+      scheduleRestored: 'שוחזרו שינויים שלא נשמרו ({when}) – לוחצים ״שמירה״ כדי שיחולו.',
+      rangeFrom: '{day} – משעה',
+      rangeTo: '{day} – עד שעה',
+      rangeOrder: 'בכל טווח, שעת הסיום צריכה להיות אחרי שעת ההתחלה.',
+      everyN: 'כל {n} דקות',
+      everyHour: 'כל שעה',
+      everyHourHalf: 'כל שעה וחצי',
+      everyTwoHours: 'כל שעתיים',
+      noBreak: 'בלי הפסקה',
+      minutesN: '{n} דקות',
+      oneHour: 'שעה',
+      noNotice: 'עד הרגע האחרון',
+      hourBefore: 'שעה לפני',
+      twoHoursBefore: 'שעתיים לפני',
+      hoursBefore: '{n} שעות לפני',
+      dayBefore: 'יום לפני',
+      twoDaysBefore: 'יומיים לפני',
+      daysBefore: '{n} ימים לפני',
+      aWeek: 'שבוע',
+      twoWeeks: 'שבועיים',
+      weeksN: '{n} שבועות',
+      aMonth: 'חודש',
+      monthHalf: 'חודש וחצי',
+      twoMonths: 'חודשיים',
+      monthsN: '{n} חודשים',
+      halfYear: 'חצי שנה',
+      aYear: 'שנה',
+      daysN: '{n} ימים',
+      blockDays: 'אילו ימים',
+      blockNotePlaceholder: 'למשל: חופשה',
+      openDays: 'פתיחה',
+      openDaysConfirm: 'לפתוח שוב את הימים האלה ({days})?',
+      pickDaysFirst: 'קודם בוחרים את הימים.',
+      daysClosed: 'הימים נסגרו לקביעת תורים',
+      pickBlockTitle: 'אילו ימים לסגור?',
+      logoutDrafts: 'יש שינויים שעוד לא נשמרו. לצאת בכל זאת? הם יימחקו מהמכשיר.',
+      pickOk: 'אישור',
+      pickOneDay: 'רק היום הזה',
+      pickFirst: 'בוחרים את היום הראשון',
+      pickLast: 'מ־{date} – עכשיו בוחרים את היום האחרון',
+      oneDay: 'יום אחד',
+      twoDays: 'יומיים',
+      nDays: '{n} ימים',
+      pickDays: 'בחירת ימים',
+      pickStartTitle: 'מאיזה יום?',
+      pickEndTitle: 'עד איזה יום?',
+      pickCloseTitle: 'אילו ימים לסגור?',
+      today: 'היום',
+      tomorrow: 'מחר',
+      inAWeek: 'בעוד שבוע',
+      dayStart: 'תחילת היום',
+      dayEnd: 'סוף היום',
+      startTime: 'שעת התחלה',
+      endTime: 'שעת סיום',
+      noticeStartLegend: 'מתי היא מתחילה להופיע?',
+      startNow: 'מעכשיו',
+      startAt: 'מיום ושעה מסוימים',
+      noticeEndLegend: 'עד מתי?',
+      endOff: 'עד שמכבים אותה',
+      endAt: 'עד יום ושעה מסוימים',
+      noticeCloseDays: 'אילו ימים',
+      noticeEndPast: 'מועד הסיום כבר עבר – נא לבחור מועד מאוחר יותר.',
+      startOver: 'להתחיל מחדש',
+      draftRestored: 'ממשיכים מאיפה שהפסקת ({when}) – זה עוד לא נשמר',
+      draftKept: 'מה שכותבים כאן נשמר במכשיר עד שלוחצים ״שמירה״, גם אם סוגרים את הדף.',
+      siteDraftRestored: 'שוחזרו שינויים שלא נשמרו ({when}). הם עוד לא באתר – לוחצים ״שמירה״.',
     },
     // Notices at the top of the site (from the admin panel)
     notice: {
@@ -7875,22 +8212,21 @@ const dictionaries = {
       cancelConfirm: 'Cancel the booking for {name}?',
       cancelledToast: 'Booking cancelled',
       weeklyHours: 'Weekly opening hours',
-      weeklyHoursSub: 'Set time ranges for each day. A day with no ranges is closed.',
+      weeklyHoursSub: 'The days and hours sessions can be booked. A day with no hours is closed. After a change, press Save below.',
       closed: 'Closed',
       addRange: 'Add range',
       removeRange: 'Remove range',
-      slotInterval: 'Time between start options (min)',
-      bufferMinutes: 'Break between sessions (min)',
-      minNoticeHours: 'Minimum notice (hours)',
-      maxDaysAhead: 'Bookable up to (days ahead)',
+      slotInterval: 'How often a session can start',
+      bufferMinutes: 'Break between sessions',
+      minNoticeHours: 'How long before a session it can be booked',
+      maxDaysAhead: 'How far ahead it can be booked',
       save: 'Save',
       saved: 'Saved',
-      blocked: 'Blocked days',
-      blockedSub: 'Vacations, holidays and other days you’re unavailable.',
-      blockDate: 'Date',
+      blocked: 'Closed days',
+      blockedSub: 'A vacation, a holiday or days without sessions: pick the days, and they’re closed to bookings until you open them again.',
       blockNote: 'Note',
-      block: 'Block day',
-      noBlocked: 'No blocked days.',
+      block: 'Close these days',
+      noBlocked: 'No closed days.',
       remove: 'Remove',
       noMessages: 'No messages.',
       markRead: 'Mark as read',
@@ -8002,15 +8338,7 @@ const dictionaries = {
       kind_alert: 'Important',
       kind_alert_sub: 'For example closed for a while – always shows, with no close button',
       noticeText: 'Text',
-      noticeWhen: 'When it shows',
-      noticeFrom: 'Starts',
-      noticeFromHint: 'Empty – from now',
-      noticeUntil: 'Ends',
-      noticeUntilHint: 'Empty – until it’s turned off',
-      clear: 'Clear',
       noticeClose: 'Close the calendar to bookings on these days',
-      noticeCloseFrom: 'From',
-      noticeCloseTo: 'To (including)',
       noticeCloseHint: 'Bookings already made on these days stay – check the Bookings tab. The days also show in Schedule, and open again when the notice is paused or deleted.',
       noticePreview: 'How it looks on the site',
       noticeSaved: 'Notice saved',
@@ -8034,7 +8362,7 @@ const dictionaries = {
       edit: 'Edit',
       closedByNotice: 'Closed by a notice on the site (opens with it)',
       contentTitle: 'The site’s content',
-      contentSub: 'Texts, the quote, prices and photos. Open a part, change it and press Save – it shows on the site at once.',
+      contentSub: 'Texts, the quote, prices and photos. Open a part, change it and press Save – it shows on the site at once. What isn’t saved yet stays on this device, even if the page is closed.',
       changedHere: 'Changed',
       unsaved: 'Unsaved changes',
       discard: 'Discard changes',
@@ -8082,6 +8410,82 @@ const dictionaries = {
       uploadFailed: 'The upload didn’t work. You can try again.',
       photoUnreadable: 'This file can’t be opened as a photo. Try another one.',
       photoSmall: 'The photo is small and may look soft on big screens.',
+      // Date and time pickers, drafts, and the tabs' explanations
+      introBookings: 'All the bookings made on the site. One waiting for payment is marked “awaiting payment”: when you see the Bit or PayBox transfer, press “Approve payment” and the booking is confirmed. “Cancel booking” frees the time for others.',
+      introClients: 'Everyone who books is kept here on their own. You can search, add a client, write notes (only the admin panel shows them) and update how many sessions are left on a card.',
+      introMessages: 'Messages sent from the site’s contact form.',
+      introMessagesWhatsapp: 'Right now the site’s contact form sends messages straight to WhatsApp, so they don’t arrive here.',
+      slotIntervalHint: 'For example “every 30 minutes”: 10:00, 10:30, 11:00…',
+      bufferMinutesHint: 'Free time after each session, before the next can be booked.',
+      minNoticeHoursHint: 'For example “3 hours before”: at 9:00, bookings start from 12:00.',
+      maxDaysAheadHint: 'How far into the calendar clients see free times.',
+      unsavedSchedule: 'There are unsaved changes – press Save.',
+      scheduleRestored: 'Unsaved changes were brought back ({when}) – press Save to apply them.',
+      rangeFrom: '{day} – from',
+      rangeTo: '{day} – until',
+      rangeOrder: 'In each range, the end must be after the start.',
+      everyN: 'Every {n} minutes',
+      everyHour: 'Every hour',
+      everyHourHalf: 'Every hour and a half',
+      everyTwoHours: 'Every two hours',
+      noBreak: 'No break',
+      minutesN: '{n} minutes',
+      oneHour: 'An hour',
+      noNotice: 'Up to the last moment',
+      hourBefore: 'An hour before',
+      twoHoursBefore: 'Two hours before',
+      hoursBefore: '{n} hours before',
+      dayBefore: 'A day before',
+      twoDaysBefore: 'Two days before',
+      daysBefore: '{n} days before',
+      aWeek: 'A week',
+      twoWeeks: 'Two weeks',
+      weeksN: '{n} weeks',
+      aMonth: 'A month',
+      monthHalf: 'A month and a half',
+      twoMonths: 'Two months',
+      monthsN: '{n} months',
+      halfYear: 'Half a year',
+      aYear: 'A year',
+      daysN: '{n} days',
+      blockDays: 'Which days',
+      blockNotePlaceholder: 'For example: vacation',
+      openDays: 'Open',
+      openDaysConfirm: 'Open these days again ({days})?',
+      pickDaysFirst: 'Pick the days first.',
+      daysClosed: 'The days are closed to bookings',
+      pickBlockTitle: 'Which days to close?',
+      logoutDrafts: 'There are unsaved changes. Sign out anyway? They’ll be removed from this device.',
+      pickOk: 'OK',
+      pickOneDay: 'Just this day',
+      pickFirst: 'Pick the first day',
+      pickLast: 'From {date} – now pick the last day',
+      oneDay: 'One day',
+      twoDays: 'Two days',
+      nDays: '{n} days',
+      pickDays: 'Pick days',
+      pickStartTitle: 'From which day?',
+      pickEndTitle: 'Until which day?',
+      pickCloseTitle: 'Which days to close?',
+      today: 'Today',
+      tomorrow: 'Tomorrow',
+      inAWeek: 'In a week',
+      dayStart: 'start of the day',
+      dayEnd: 'end of the day',
+      startTime: 'Start time',
+      endTime: 'End time',
+      noticeStartLegend: 'When does it start showing?',
+      startNow: 'From now',
+      startAt: 'From a day and time',
+      noticeEndLegend: 'Until when?',
+      endOff: 'Until it’s turned off',
+      endAt: 'Until a day and time',
+      noticeCloseDays: 'Which days',
+      noticeEndPast: 'The end has already passed – please pick a later time.',
+      startOver: 'Start over',
+      draftRestored: 'Carrying on where you left off ({when}) – not saved yet',
+      draftKept: 'What you type here stays on this device until you press Save, even if the page is closed.',
+      siteDraftRestored: 'Unsaved changes were brought back ({when}). They’re not on the site yet – press Save.',
     },
     notice: {
       region: 'Notices from the clinic',

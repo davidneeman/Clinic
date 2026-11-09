@@ -105,6 +105,7 @@
 
       <!-- Bookings -->
       <div role="tabpanel" id="panel-bookings" aria-labelledby="tab-bookings">
+        <p class="tab-intro" data-i18n="admin.introBookings"></p>
         <div class="toolbar" id="booking-scopes">
           <button class="btn btn-outline btn-sm" type="button" data-scope="upcoming" aria-pressed="true" data-i18n="admin.upcoming"></button>
           <button class="btn btn-outline btn-sm" type="button" data-scope="past" aria-pressed="false" data-i18n="admin.past"></button>
@@ -120,32 +121,36 @@
           <p class="panel-sub" data-i18n="admin.weeklyHoursSub"></p>
           <div class="hours" id="hours"></div>
           <div class="settings-grid">
-            <div class="field"><label for="s-interval" data-i18n="admin.slotInterval"></label><input id="s-interval" name="slotInterval" type="number" min="5" max="240" step="5" required></div>
-            <div class="field"><label for="s-buffer" data-i18n="admin.bufferMinutes"></label><input id="s-buffer" name="bufferMinutes" type="number" min="0" max="240" step="5" required></div>
-            <div class="field"><label for="s-notice" data-i18n="admin.minNoticeHours"></label><input id="s-notice" name="minNoticeHours" type="number" min="0" max="336" required></div>
-            <div class="field"><label for="s-ahead" data-i18n="admin.maxDaysAhead"></label><input id="s-ahead" name="maxDaysAhead" type="number" min="1" max="365" required></div>
+            <div class="field"><label for="s-interval" data-i18n="admin.slotInterval"></label><select id="s-interval" name="slotInterval"></select><small class="field-hint" data-i18n="admin.slotIntervalHint"></small></div>
+            <div class="field"><label for="s-buffer" data-i18n="admin.bufferMinutes"></label><select id="s-buffer" name="bufferMinutes"></select><small class="field-hint" data-i18n="admin.bufferMinutesHint"></small></div>
+            <div class="field"><label for="s-notice" data-i18n="admin.minNoticeHours"></label><select id="s-notice" name="minNoticeHours"></select><small class="field-hint" data-i18n="admin.minNoticeHoursHint"></small></div>
+            <div class="field"><label for="s-ahead" data-i18n="admin.maxDaysAhead"></label><select id="s-ahead" name="maxDaysAhead"></select><small class="field-hint" data-i18n="admin.maxDaysAheadHint"></small></div>
           </div>
+          <p class="draft-note" id="schedule-unsaved" hidden></p>
           <div id="schedule-alert" role="status"></div>
           <button class="btn btn-primary" type="submit" data-i18n="admin.save"></button>
         </form>
 
         <h2 class="subhead" data-i18n="admin.blocked"></h2>
         <p class="panel-sub" data-i18n="admin.blockedSub"></p>
-        <form class="inline-form" id="block-form" novalidate>
-          <div class="field"><label for="block-date" data-i18n="admin.blockDate"></label><input id="block-date" name="date" type="date" required></div>
-          <div class="field"><label for="block-note" data-i18n="admin.blockNote"></label><input id="block-note" name="note" maxlength="120"></div>
+        <form class="inline-form block-form" id="block-form" novalidate>
+          <div class="field"><label for="block-days" data-i18n="admin.blockDays"></label><div id="block-days-slot"></div></div>
+          <div class="field"><label for="block-note" data-i18n="admin.blockNote"></label><input id="block-note" name="note" maxlength="120" data-i18n-attr="placeholder:admin.blockNotePlaceholder"></div>
           <button class="btn btn-outline" type="submit" data-i18n="admin.block"></button>
         </form>
+        <div id="block-alert" role="status"></div>
         <div class="list" id="blocked-list"></div>
       </div>
 
       <!-- Messages -->
       <div role="tabpanel" id="panel-messages" aria-labelledby="tab-messages" hidden>
+        <p class="tab-intro" id="messages-intro" data-i18n="admin.introMessages"></p>
         <div class="list" id="messages-list"></div>
       </div>
 
       <!-- Clients -->
       <div role="tabpanel" id="panel-clients" aria-labelledby="tab-clients" hidden>
+        <p class="tab-intro" data-i18n="admin.introClients"></p>
         <div class="toolbar">
           <div class="field client-search">
             <input id="client-search" type="search" autocomplete="off" data-i18n-attr="placeholder:admin.searchClients;aria-label:admin.searchClients">
@@ -183,6 +188,7 @@
 
         <!-- While there are changes that aren't saved -->
         <div class="save-bar" id="save-bar" hidden>
+          <p class="save-restored" id="save-restored" hidden></p>
           <div class="save-bar-inner">
             <span class="save-bar-text" data-i18n="admin.unsaved"></span>
             <button class="btn btn-primary btn-sm" type="button" id="content-save" data-i18n="admin.save"></button>

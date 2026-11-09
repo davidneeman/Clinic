@@ -235,7 +235,32 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
           .run();
       }
     },
+    /** Closes every day from `from` to `to` (a vacation in one go); a day already closed keeps one row. */
+    async addBlockedRange(from, to, note) {
+      const days = `WITH RECURSIVE d(day) AS (SELECT ?1 UNION ALL SELECT date(day, '+1 day') FROM d WHERE day < ?2)`;
+      try {
+        return await db
+          .prepare(`${days} INSERT INTO blocked_dates (date, note) SELECT day, ?3 FROM d WHERE true ON CONFLICT(date) DO UPDATE SET note = excluded.note, notice_id = NULL`)
+          .bind(from, to, note || null)
+          .run();
+      } catch (err) {
+        if (!/no such column: notice_id/.test(String(err?.message))) throw err;
+        return db
+          .prepare(`${days} INSERT INTO blocked_dates (date, note) SELECT day, ?3 FROM d WHERE true ON CONFLICT(date) DO UPDATE SET note = excluded.note`)
+          .bind(from, to, note || null)
+          .run();
+      }
+    },
     removeBlocked: async (date) => changed(await db.prepare('DELETE FROM blocked_dates WHERE date = ?').bind(date).run()),
+    /** Opens the days from `from` to `to` that were closed by hand (a notice's days stay with it). */
+    removeBlockedRange: async (from, to) => {
+      try {
+        return changed(await db.prepare('DELETE FROM blocked_dates WHERE date BETWEEN ? AND ? AND notice_id IS NULL').bind(from, to).run());
+      } catch (err) {
+        if (!/no such column: notice_id/.test(String(err?.message))) throw err;
+        return changed(await db.prepare('DELETE FROM blocked_dates WHERE date BETWEEN ? AND ?').bind(from, to).run());
+      }
+    },
     addMessage: (m) =>
       db
         .prepare('INSERT INTO messages (name, phone, email, message) VALUES (?, ?, ?, ?)')
