@@ -60,7 +60,29 @@ function fmtDate(dateStr, opts = { weekday: 'long', day: 'numeric', month: 'long
 // Steps
 // ---------------------------------------------------------------------------
 
-function goTo(step, { focus = true } = {}) {
+// The phone's Back button goes back a step (with what was chosen), not off the page. One entry in
+// the browser's history stands for "a step back"; once the booking is made, Back doesn't open the
+// form again (the payment details stay on the screen).
+let stepBack = false;
+function keepBack(step) {
+  if (step > 1 && !stepBack) {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    history.pushState(history.state, '');
+    stepBack = true;
+  } else if (step === 1 && stepBack) {
+    stepBack = false;
+    history.back();
+  }
+}
+window.addEventListener('popstate', () => {
+  if (!stepBack) return;
+  stepBack = false;
+  if (!$('confirmation').hidden || state.step <= 1) return;
+  goTo(state.step - 1);
+});
+
+function goTo(step, { focus = true, back = true } = {}) {
+  if (back) keepBack(step);
   state.step = step;
   for (let i = 1; i <= 3; i++) $(`step-${i}`).hidden = i !== step;
   for (const li of $('stepper').children) {
@@ -620,11 +642,11 @@ loadConfig()
     if (cancelledRef) {
       return returnCancelled(cancelledRef).then((s) => {
         renderAll();
-        goTo(s ? 2 : 1, { focus: false });
+        goTo(s ? 2 : 1, { focus: false, back: false });
         setAlert('time-alert', 'info', t('book.payCancelled'));
       });
     }
-    goTo(preset ? 2 : 1, { focus: false });
+    goTo(preset ? 2 : 1, { focus: false, back: false });
   })
   .catch(() => {
     $('service-options').replaceChildren(el('p', { class: 'alert alert-error' }, t('common.error')));

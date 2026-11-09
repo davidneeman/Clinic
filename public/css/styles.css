@@ -6922,3 +6922,18 @@ html.js .reveal:not(.is-visible) {
 #schedule-form .draft-note {
   margin-block: 4px 14px;
 }
+
+/* A name, an email or notes with no spaces (a pasted link, a long address) wrap, instead of
+   making the whole panel wider than the phone */
+.admin-wrap {
+  overflow-wrap: anywhere;
+}
+
+/* (a button's or a tab's words stay whole) */
+.admin-wrap :is(button, .btn, .tab, label) {
+  overflow-wrap: normal;
+}
+
+.item > * {
+  min-width: 0;
+}

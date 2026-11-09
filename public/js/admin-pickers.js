@@ -146,7 +146,10 @@ export function pickDate({ title, value = '', from = '', to = '', range = false,
           ),
         );
       }
+      // (the days are drawn again: the one that had the keys keeps them, for keyboard and screen reader)
+      const focused = grid.contains(document.activeElement) ? document.activeElement.dataset.date : null;
       grid.replaceChildren(...cells);
+      if (focused) grid.querySelector(`.day[data-date="${focused}"]`)?.focus({ preventScroll: true });
       if (range) {
         if (start && end) status.replaceChildren(...rangeNodes(start, end));
         else status.textContent = !start ? t('admin.pickFirst') : t('admin.pickLast', { date: formatDate(start, { weekday: 'short', month: 'short' }) });

@@ -413,7 +413,15 @@ export async function busyTimes(settings, { from, to, tz }, fetchImpl = fetch) {
 
 // ---------- Adding a booking ----------
 
-const icsText = (s) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+// (control characters aren't allowed in an event's text: left out, so the calendar takes it)
+const icsText = (s) =>
+  String(s ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
 
 // iCalendar lines are at most 75 bytes; longer ones continue on the next line after a space.
 function fold(line) {

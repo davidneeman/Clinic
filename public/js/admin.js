@@ -54,18 +54,43 @@ function dayName(i) {
 }
 
 function alertIn(id, kind, message) {
-  $(id).replaceChildren(message ? el('p', { class: `alert alert-${kind}` }, message) : '');
+  $(id)?.replaceChildren(message ? el('p', { class: `alert alert-${kind}` }, message) : '');
 }
 
+/** A form's save: while it's saving its button is off, so a double tap saves once. */
+function onSave(form, save) {
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (form.dataset.saving) return;
+    form.dataset.saving = '1';
+    const button = form.querySelector('[type="submit"]');
+    if (button) button.disabled = true;
+    try {
+      await save(e);
+    } finally {
+      delete form.dataset.saving;
+      if (button) button.disabled = false;
+    }
+  });
+}
+
+/**
+ * Runs a call to the server. If the sign-in has run out, the sign-in screen shows and what was
+ * being done stops there: nothing says "done" when it wasn't, and nothing typed is thrown away.
+ */
 async function guarded(fn) {
   try {
     return await fn();
   } catch (err) {
-    if (err.status === 401) return showLogin();
-    toast(t('common.error'));
+    if (err.status === 401) showLogin();
+    else toast(t('common.error'));
     throw err;
   }
 }
+// (an action stopped that way needs no other message: the sign-in screen says it all)
+window.addEventListener('unhandledrejection', (e) => {
+  if (e.reason?.status === 401) e.preventDefault();
+});
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -359,6 +384,7 @@ for (const b of document.querySelectorAll('[data-scope]')) {
 async function loadBookings() {
   const { bookings } = await guarded(() => api(`/api/admin/bookings?scope=${state.scope}`));
   state.bookings = bookings;
+  state.bookingsAt = Date.now();
   if (state.scope === 'upcoming') {
     // Bookings waiting for David to see the payment (Bit or PayBox) and approve them.
     const waiting = bookings.filter((b) => b.status === 'pending').length;
@@ -367,6 +393,13 @@ async function loadBookings() {
   }
   renderBookings();
 }
+
+// Back to the panel after a while (it was left open on the phone): new bookings, and the ones
+// waiting for him to approve, show without reloading the page.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || $('dashboard').hidden || Date.now() - (state.bookingsAt || 0) < 30_000) return;
+  loadBookings().catch(() => {});
+});
 
 /** What a booking paid by Bit or PayBox is for, and how much: one line for the list. */
 function planLine(b) {
@@ -625,8 +658,7 @@ function renderHours() {
 
 $('schedule-form').addEventListener('change', scheduleChanged);
 
-$('schedule-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+onSave($('schedule-form'), async () => {
   alertIn('schedule-alert');
   // Each range must end after it starts.
   const wrong = state.schedule.weeklyHours.some?.((ranges) => ranges.some(([a, b]) => a >= b));
@@ -708,8 +740,7 @@ function renderBlocked() {
   );
 }
 
-$('block-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+onSave($('block-form'), async () => {
   alertIn('block-alert');
   const { from, to } = blockField().value;
   if (!from) {
@@ -950,8 +981,7 @@ async function openClient(id) {
   };
   form.addEventListener('input', keep);
   form.addEventListener('click', (e) => e.target.closest('.card-row button') && setTimeout(keep));
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  onSave(form, async () => {
     clearFieldErrors(form);
     alertIn('client-alert');
     const data = Object.fromEntries(new FormData(form));
@@ -1036,8 +1066,7 @@ function renderPeople() {
   );
 }
 
-$('invite-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+onSave($('invite-form'), async () => {
   clearFieldErrors($('invite-form'));
   const name = $('invite-name').value.trim();
   if (name.length < 2) return showFieldErrors($('invite-form'), ['name'], { name: 'admin.inviteNameNeeded' });

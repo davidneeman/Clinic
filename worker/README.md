@@ -26,6 +26,7 @@ Ready now:
 - Everything the site does today, on Cloudflare.
 - The admin panel, with Face ID sign-in and David's client list (below).
 - Security headers on every page and file, and limits per visitor.
+- Encrypted only: a page asked for over plain `http://` moves to `https://`, and the API refuses plain http (allowed on `localhost`, for development).
 - The database.
 - Payment at booking through Grow, tested against a stand-in for Grow's API.
 - The iCloud calendar, tested against a real CalDAV server (Radicale).

@@ -1,5 +1,11 @@
 // Runs synchronously in <head> so the page never flashes the wrong theme, direction or text size.
 (function () {
+  // Only over https (the admin page and the other files come without the server's own move to
+  // https): on this computer, while developing, plain http is fine.
+  if (location.protocol === 'http:' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    location.replace('https:' + location.href.slice(5));
+    return;
+  }
   var root = document.documentElement;
   var theme = 'light';
   var lang = 'he';

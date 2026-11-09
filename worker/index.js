@@ -78,12 +78,20 @@ const PLANS = new Set(['single', 'pack', 'card']);
 const localPhone = (phone) => String(phone || '').replace(/^\+972[\s-]*/, '0');
 // The pages that come with David's content in them (the others are served as they are).
 const PAGES = new Set(['/', '/book']);
+// Where plain http is fine: this computer, while developing.
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 // How long a page waits for the database before it's served without his changes.
 const PAGE_DATA_MS = 2500;
 
+// Characters a keyboard doesn't type: control characters, text-direction overrides, and half of
+// an emoji (a calendar would refuse an event with them). Left out of what visitors send.
+const HIDDEN = /[\u0000-\u0008\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+
+/** A text as sent, cleaned and cut to `max` characters (never in the middle of an emoji). */
 function str(v, max) {
   if (typeof v !== 'string') return '';
-  return v.trim().slice(0, max);
+  const s = v.replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(HIDDEN, '').trim();
+  return [...s].slice(0, max).join('').trim();
 }
 
 const invalid = (fields) => new HttpError(400, 'invalid', { fields });
@@ -916,6 +924,13 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       const url = new URL(request.url);
       try {
         if (url.pathname === '/healthz') return json({ ok: true });
+        // Only encrypted: a page asked for over plain http moves to its https address, and
+        // nothing is taken over plain http (on this computer, while developing, it's allowed).
+        if (url.protocol === 'http:' && !LOCAL_HOSTS.has(url.hostname)) {
+          if (url.pathname.startsWith('/api/')) return json({ error: 'https_required' }, 403);
+          url.protocol = 'https:';
+          return new Response(null, { status: 301, headers: { Location: url.toString() } });
+        }
         if (url.pathname.startsWith('/api/')) return await api(request, env, url, ctx);
         const read = request.method === 'GET' || request.method === 'HEAD';
         const photo = /^\/media\/([a-z2-7]{16}-\d{3,4})\.jpg$/.exec(url.pathname);

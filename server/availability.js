@@ -21,15 +21,16 @@ export function slotsForDay({ date, duration, schedule, dayBookings = [], blocke
   const earliest = today * 1440 + now.minutes + schedule.minNoticeHours * 60;
   const buffer = schedule.bufferMinutes;
   const ranges = schedule.weeklyHours[String(weekday(date))] || [];
-  const slots = [];
+  const slots = new Set();
 
   for (const [from, to] of ranges) {
     const end = toMinutes(to);
     for (let t = toMinutes(from); t + duration <= end; t += schedule.slotInterval) {
       if (day * 1440 + t < earliest) continue;
       const clash = dayBookings.some((b) => t < b.end + buffer && b.start < t + duration + buffer);
-      if (!clash) slots.push(fromMinutes(t));
+      if (!clash) slots.add(t);
     }
   }
-  return slots;
+  // In order, and each time once, even when two ranges of hours overlap.
+  return [...slots].sort((a, b) => a - b).map(fromMinutes);
 }
