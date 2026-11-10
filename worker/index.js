@@ -115,14 +115,6 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
   const modeOf = (env) => (MODES.has(env.BOOKING_MODE) ? env.BOOKING_MODE : 'whatsapp');
   const storeFor = (env) => openD1Store(env.DB, config.defaultSchedule, clock);
   const contentFor = (env) => openContentStore(env.DB, clock);
-  // The GitHub Pages copy of the site may read the site's content and notices from here.
-  const pagesOrigin = (() => {
-    try {
-      return config.siteUrl ? new URL(config.siteUrl).origin : null;
-    } catch {
-      return null;
-    }
-  })();
 
   /** The site's settings with David's treatments and prices from the admin panel. */
   async function siteFor(env) {
@@ -380,16 +372,14 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       });
     }
 
-    // What the GitHub Pages copy needs to look like the site: David's content, the notices,
-    // the opening hours and the closed days. All of it is on the site's pages anyway.
+    // The site's public data in one answer: David's content, the notices, the opening hours and
+    // the closed days. All of it is on the site's pages anyway (and no other site may read it).
     if (route === 'GET /api/site') {
       const today = now().date;
       const editor = contentFor(env);
       const [data, schedule] = await Promise.all([editor.publicSite(), store.getSchedule()]);
       const closed = await editor.closedDays(today, addDays(today, schedule.maxDaysAhead));
-      const origin = request.headers.get('Origin');
-      const cors = origin && origin === pagesOrigin ? { 'Access-Control-Allow-Origin': origin } : {};
-      return json({ ...data, schedule, closed }, 200, { ...cors, Vary: 'Origin' });
+      return json({ ...data, schedule, closed });
     }
 
     if (route === 'GET /api/availability') {

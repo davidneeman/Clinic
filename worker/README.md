@@ -16,7 +16,7 @@ The site runs on Cloudflare's free plan:
 `BOOKING_MODE` in `wrangler.jsonc` decides how bookings work:
 
 - `"transfer"` (now): bookings are made on the site, and the client pays by Bit or PayBox to David's phone (058-434-4047): one session (350 ₪), the 4-session card (1,200 ₪, this session included), or a session from a card they already have (nothing to pay). The confirmation shows the number, the amount and the booking number to write in the transfer's note. The time is held until David approves it under **פגישות** (or the appointment time passes); approving adds the client to **לקוחות**, adds the card's other 3 sessions or takes one, and puts the booking in his calendar. The site can't see Bit or PayBox payments itself, so approving is by hand. Messages still go to WhatsApp.
-- `"whatsapp"`: exactly like the GitHub Pages site today. A booking request or a message opens WhatsApp, and nothing is stored. The free times come from the opening hours, minus the days closed in the admin panel (and, once connected, minus his calendar).
+- `"whatsapp"`: like the first version of the site. A booking request or a message opens WhatsApp, and nothing is stored. The free times come from the opening hours, minus the days closed in the admin panel (and, once connected, minus his calendar).
 - `"pay"`: what David chose. The client books and pays in full on the site, and messages still go to WhatsApp. See "Payment at booking" below.
 - `"online"`: bookings and messages are taken and stored on the site without payment.
 
@@ -74,9 +74,9 @@ You'll need David's Cloudflare account. Cloudflare's dashboard is renamed now an
    1. Cloudflare doesn't sell `.co.il` addresses: buy it from an Israeli registrar, in David's name. A `.com` can be bought on Cloudflare itself.
    2. In Cloudflare, add the domain to David's account (**Add a site**, Free plan). At the registrar, switch its nameservers to the two that Cloudflare shows.
    3. Under **Workers & Pages → clinic → Settings → Domains & Routes → Add → Custom domain**, add the address, and `www.` too.
-   4. Set `siteUrl` in `config/site.json` to `https://<domain>/`. Link previews, the canonical address and search results all use it.
+   4. Set `siteUrl` in `config/site.json` to `https://<domain>/` (today it's `https://clinic.davidneeman.workers.dev/`, the main site). Link previews, the canonical address, search results and the old GitHub Pages address (below) all use it.
    5. Make a new first sign-in link for the new address (step 5). If Cloudflare Access is used, move its application there too.
-   6. Send the old GitHub Pages address to the new one.
+   6. Run `npm run build:pages` and push: the old GitHub Pages address then sends visitors to the new one.
 8. **Extra protection, also free:**
    - Under **Security → WAF → Rate limiting rules**, add one rule: when the URI path starts with `/api/`, at most 60 requests in 10 seconds per IP, otherwise block. Floods are stopped before they reach the Worker or its daily limit.
    - **Backups:** D1 keeps a restorable history of the database (Time Travel), with nothing to set up. `npx wrangler d1 export clinic --remote --output <file>` writes a full copy, which contains clients' personal details. Keep such a copy encrypted, and never in this repository.
@@ -129,7 +129,7 @@ David changes the site himself, from his phone:
 
 A photo he picks is framed on the phone in the shape it has on the site (the arch shows its window lines), then uploaded in the three sizes the site uses, as a new JPEG: the location and camera details in the phone's file don't go with it, and the server strips any that would. Uploads nothing uses are deleted after two weeks (time enough to save a draft that has one).
 
-His changes are kept in D1 (`settings` → `content`, and the `notices` table) and are on the site at once: the Worker puts them into the home and booking pages as they're served (with the same security headers), and `/api/config` gives the booking page his names and prices. The GitHub Pages copy reads the same from `/api/site` (allowed for that address only) and keeps it in the browser, so it looks the same.
+His changes are kept in D1 (`settings` → `content`, and the `notices` table) and are on the site at once: the Worker puts them into the home and booking pages as they're served (with the same security headers), and `/api/config` gives the booking page his names and prices. The old GitHub Pages address (`docs/`, from `npm run build:pages`) no longer has a copy of the site: it sends visitors to the same place on the main site (an old link to the booking page opens the booking page).
 
 ## The iPhone calendar (iCloud)
 

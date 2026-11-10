@@ -1,6 +1,5 @@
 {
-  "siteUrl": "https://davidneeman.github.io/Clinic/",
-  "cloudflareUrl": "https://clinic.davidneeman.workers.dev/",
+  "siteUrl": "https://clinic.davidneeman.workers.dev/",
   "googleCalendarUrl": "",
   "business": {
     "name": {

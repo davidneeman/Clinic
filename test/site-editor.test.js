@@ -442,19 +442,19 @@ test('a notice can close the calendar on chosen days; they open again with it', 
   assert.deepEqual((await ctx.call('/api/admin/schedule', { cookie: me })).body.blocked.map((b) => b.date), ['2026-10-06', '2026-10-07']);
 });
 
-test('the GitHub Pages copy may read the site’s content; other sites may not', async () => {
+test('the site’s public data in one answer; no other site may read it (not even the old GitHub address)', async () => {
   const ctx = setup();
   const me = await ctx.signIn();
   await ctx.save(me, { texts: { 'about.quote': 'ציטוט חדש' } });
   await notice(ctx, me, { kind: 'alert', text: 'סגור', closeFrom: '2026-10-04', closeTo: '2026-10-04' });
-  const ours = await ctx.call('/api/site', { headers: { Origin: 'https://davidneeman.github.io' } });
-  assert.equal(ours.headers.get('Access-Control-Allow-Origin'), 'https://davidneeman.github.io');
-  assert.equal(ours.body.content.texts['about.quote'], 'ציטוט חדש');
-  assert.deepEqual(ours.body.notices.map((n) => n.text), ['סגור']);
-  assert.deepEqual(ours.body.closed, ['2026-10-04']);
-  assert.equal(ours.body.schedule.maxDaysAhead, 30);
-  const theirs = await ctx.call('/api/site', { headers: { Origin: 'https://evil.example' } });
-  assert.equal(theirs.headers.get('Access-Control-Allow-Origin'), null);
+  const site = await ctx.call('/api/site');
+  assert.equal(site.body.content.texts['about.quote'], 'ציטוט חדש');
+  assert.deepEqual(site.body.notices.map((n) => n.text), ['סגור']);
+  assert.deepEqual(site.body.closed, ['2026-10-04']);
+  assert.equal(site.body.schedule.maxDaysAhead, 30);
+  for (const origin of ['https://davidneeman.github.io', 'https://evil.example']) {
+    assert.equal((await ctx.call('/api/site', { headers: { Origin: origin } })).headers.get('Access-Control-Allow-Origin'), null, origin);
+  }
 });
 
 test('once a day, uploads nothing uses any more are deleted (not the ones in use, not new ones)', async () => {
