@@ -13,6 +13,7 @@ import {
   toast,
 } from './site.js';
 import { svg } from './icons.js';
+import { beforeGoogle, fmtPhone, googleReturn, initAccount, onAccount, reloadAccount, signedIn } from './account.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -338,6 +339,63 @@ function planAmount(plan) {
 }
 const planPrice = (plan) => (plan === 'card' ? t('book.fromCard') : formatPrice(planAmount(plan)));
 
+// Signed in with sessions left on the card: a session from it is booked at once.
+const cardLeft = () => signedIn()?.client?.cardLeft ?? 0;
+let planTouched = false;
+function renderCardPlan() {
+  if (!viaTransfer()) return;
+  const sub = document.querySelector('#plan-options input[value="card"] ~ .plan-text .plan-sub');
+  if (cardLeft() > 0) {
+    delete sub.dataset.i18n; // (its own text, kept when the page translates itself again)
+    sub.textContent = t('account.fromCardNow', { n: cardLeft() });
+  } else {
+    sub.dataset.i18n = 'book.planCardSub';
+    sub.textContent = t('book.planCardSub');
+  }
+}
+
+// Signing in with Google leaves the page for a moment: what was chosen and typed comes back
+// with it (kept in this tab only, and only for that).
+const KEPT = 'book:google';
+function keepChoices() {
+  const form = Object.fromEntries(new FormData($('details-form')));
+  delete form.consent;
+  try {
+    sessionStorage.setItem(KEPT, JSON.stringify({ service: state.service?.id, month: state.month, date: state.date, time: state.time, step: state.step, form }));
+  } catch {}
+}
+function keptChoices() {
+  let kept = null;
+  try {
+    kept = JSON.parse(sessionStorage.getItem(KEPT) || 'null');
+    sessionStorage.removeItem(KEPT);
+  } catch {}
+  return googleReturn() ? kept : null;
+}
+
+// The details of the client who signed in go into the form (never over what's typed there), and
+// come out of it when they sign out (unless changed).
+const prefilled = {};
+function prefill(me) {
+  const form = $('details-form');
+  const values = me ? { name: me.name, phone: fmtPhone(me.phone || ''), email: me.email } : {};
+  for (const name of ['name', 'phone', 'email']) {
+    const input = form.elements[name];
+    if (me && values[name] && !input.value.trim()) {
+      input.value = values[name];
+      prefilled[name] = values[name];
+    } else if (!me && prefilled[name] && input.value === prefilled[name]) {
+      input.value = '';
+      delete prefilled[name];
+    }
+  }
+  if (viaTransfer() && me && cardLeft() > 0 && !planTouched && !new URLSearchParams(location.search).get('plan')) {
+    document.querySelector('#plan-options input[value="card"]').checked = true;
+  }
+  renderCardPlan();
+  renderSummary();
+}
+
 function renderPlans() {
   if (!viaTransfer()) return;
   const { pack } = state.config.prices;
@@ -401,7 +459,7 @@ async function submit(e) {
   button.textContent = t(paying ? 'book.paying' : transfer ? 'book.saving' : 'book.confirming');
   let leaving = false;
   try {
-    const { booking, payUrl, token, transfer: payTo } = await api('/api/bookings', {
+    const { booking, payUrl, token, transfer: payTo, cardLeft: left } = await api('/api/bookings', {
       method: 'POST',
       body: {
         serviceId: state.service.id,
@@ -416,6 +474,12 @@ async function submit(e) {
         plan: transfer ? selectedPlan() : undefined,
       },
     });
+    // From the card, signed in: confirmed at once (and the card has one session less).
+    if (booking.status === 'confirmed' && booking.plan === 'card') {
+      showConfirmation(booking, false, null, null, { cardLeft: left });
+      reloadAccount();
+      return;
+    }
     if (payTo) return showConfirmation(booking, false, null, payTo);
     if (payUrl) {
       // Off to Grow's page. This tab remembers the booking for when the client comes back.
@@ -501,11 +565,18 @@ let confirmed = null;
 
 function renderConfirmation() {
   if (!confirmed) return;
-  const { booking, whatsappHref, payTo, status } = confirmed;
+  const { booking, whatsappHref, payTo, status, fromCard } = confirmed;
   const title = $('confirm-title');
-  title.dataset.i18n = payTo ? (status === 'confirmed' ? 'book.statusConfirmed' : 'book.transferTitle') : whatsappHref ? 'book.waTitle' : 'book.successTitle';
+  title.dataset.i18n = fromCard ? 'book.statusConfirmed' : payTo ? (status === 'confirmed' ? 'book.statusConfirmed' : 'book.transferTitle') : whatsappHref ? 'book.waTitle' : 'book.successTitle';
   title.textContent = t(title.dataset.i18n);
-  $('confirm-text').textContent = payTo
+  const left = fromCard?.cardLeft;
+  $('confirm-text').textContent = fromCard
+    ? left > 1
+      ? t('account.cardDone', { n: left })
+      : left === 1
+        ? t('account.cardDoneOne')
+        : t('account.cardDoneNone')
+    : payTo
     ? booking.plan === 'card'
       ? t('book.transferCardText')
       : t('book.transferText', { amount: formatPrice(booking.price) })
@@ -537,8 +608,8 @@ function renderConfirmation() {
   $('confirm-details').replaceChildren(...rows.flatMap(([k, v]) => [el('dt', {}, t(k)), el('dd', {}, v)]));
 }
 
-function showConfirmation(booking, emailed, whatsappHref = null, payTo = null) {
-  confirmed = { booking, whatsappHref, payTo, status: payTo ? 'pending' : null };
+function showConfirmation(booking, emailed, whatsappHref = null, payTo = null, fromCard = null) {
+  confirmed = { booking, whatsappHref, payTo, status: payTo ? 'pending' : null, fromCard };
   if (payTo) watchApproval(booking.ref);
   $('booking-flow').hidden = true;
   document.querySelector('.page-hero').hidden = true;
@@ -589,6 +660,7 @@ function renderAll() {
   renderSummary();
   renderConsent();
   renderPlans();
+  renderCardPlan();
   renderConfirmation();
 }
 
@@ -623,7 +695,10 @@ loadConfig()
       const wanted = new URLSearchParams(location.search).get('plan');
       const pick = document.querySelector(`#plan-options input[value="${wanted === 'pack' || wanted === 'card' ? wanted : 'single'}"]`);
       if (pick) pick.checked = true;
-      $('plan-options').addEventListener('change', renderSummary);
+      $('plan-options').addEventListener('change', () => {
+        planTouched = true;
+        renderSummary();
+      });
     } else if (viaWhatsApp()) {
       // The request is sent from the client's own WhatsApp, so the practitioner
       // already sees their number: no phone or email fields.
@@ -633,6 +708,24 @@ loadConfig()
     }
     const preset = config.services.find((s) => s.id === new URLSearchParams(location.search).get('service'));
     if (preset) state.service = preset;
+    // Back from Google's page: as it was before.
+    const kept = keptChoices();
+    const keptService = kept && config.services.find((x) => x.id === kept.service);
+    if (keptService) {
+      Object.assign(state, { service: keptService, month: kept.month || state.month, date: kept.date, time: kept.time });
+      for (const [name, value] of Object.entries(kept.form || {})) {
+        const input = $('details-form').elements[name];
+        if (!input || !value) continue;
+        if (input instanceof RadioNodeList) {
+          for (const r of input) r.checked = r.value === value;
+          planTouched = true;
+        } else input.value = value;
+      }
+    }
+    // Signing in (when it's set up): the client's card and details.
+    onAccount(prefill);
+    beforeGoogle(keepChoices);
+    initAccount(config);
     const back = viaPayment() ? new URLSearchParams(location.search) : null;
     const paidRef = back?.get('paid');
     const cancelledRef = back?.get('cancelled');
@@ -646,7 +739,7 @@ loadConfig()
         setAlert('time-alert', 'info', t('book.payCancelled'));
       });
     }
-    goTo(preset ? 2 : 1, { focus: false, back: false });
+    goTo(keptService ? Math.min(3, Math.max(1, Number(kept.step) || 1)) : preset ? 2 : 1, { focus: false, back: Boolean(keptService) });
   })
   .catch(() => {
     $('service-options').replaceChildren(el('p', { class: 'alert alert-error' }, t('common.error')));

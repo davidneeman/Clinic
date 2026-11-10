@@ -17,3 +17,13 @@ GROW_PAGE_CODE=
 # The iCloud calendar: the Apple ID email and an app-specific password.
 ICLOUD_USER=
 ICLOUD_APP_PASSWORD=
+
+# Signing in on the site (worker/README.md → "Signing in on the site"). Google's client ID and
+# secret (its redirect URIs must include http://localhost:8787/api/auth/google/callback), and
+# Twilio Verify for SMS codes. Locally, the *_URL settings can point to a stand-in on
+# http://127.0.0.1:… instead (they're used only for requests to localhost).
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_VERIFY_SERVICE=

@@ -25,6 +25,9 @@ const state = {
   me: null,
   // The "האתר" tab (on Cloudflare): notices, texts, prices and photos.
   editor: false,
+  // Signing in with Google (once it's set up): managers, and clients with the Gmail on their card.
+  google: false,
+  clientGoogle: false,
 };
 
 const siteTab = createSiteTab({
@@ -107,6 +110,7 @@ function showLogin() {
     for (const id of ['login-form', 'admin-disabled', 'access-logout']) $(id).hidden = true;
     $('passkey-login').hidden = invite;
     $('register-form').hidden = !invite;
+    $('google-login').hidden = !state.google;
     renderSignIn();
     return;
   }
@@ -280,6 +284,45 @@ async function addThisDevice() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Google: signing in with it, and connecting one's own account (in the people tab)
+// ---------------------------------------------------------------------------
+
+/** Off to Google's page: to sign in ('admin') or to connect the account ('link'). */
+async function toGoogle(purpose, button) {
+  if (button) button.disabled = true;
+  try {
+    const { url } = await api('/api/auth/google/start', { method: 'POST', body: { for: purpose, lang: document.documentElement.lang } });
+    location.assign(url);
+  } catch (err) {
+    if (button) button.disabled = false;
+    if (err.status === 401) return showLogin();
+    const key = err.data?.error === 'reauth_required' ? 'admin.googleReauth' : err.status === 429 ? 'errors.rate' : 'account.backFailed';
+    if (purpose === 'admin') alertIn('passkey-alert', 'error', t(key));
+    else toast(t(key));
+  }
+}
+$('google-login-btn').addEventListener('click', (e) => toGoogle('admin', e.currentTarget));
+
+// Back from Google's page (#signin=…): what happened.
+const GOOGLE_BACK = {
+  unknown: 'admin.googleUnknown',
+  linked: 'admin.googleLinked',
+  taken: 'admin.googleTaken',
+  cancelled: 'account.backCancelled',
+  expired: 'account.backExpired',
+  unverified: 'account.backUnverified',
+};
+const googleBack = /^#signin=(\w+)$/.exec(location.hash)?.[1] || '';
+if (googleBack) history.replaceState(null, '', location.pathname);
+function afterGoogle(loggedIn) {
+  if (!googleBack || googleBack === 'ok') return;
+  const message = t(GOOGLE_BACK[googleBack] || 'account.backFailed');
+  if (!loggedIn) return alertIn('passkey-alert', googleBack === 'linked' ? 'success' : 'error', message);
+  toast(message);
+  if (googleBack === 'linked' || googleBack === 'taken') selectTab('people');
+}
+
 $('device-offer-add').addEventListener('click', addThisDevice);
 $('welcome-close').addEventListener('click', () => ($('welcome').hidden = true));
 $('device-offer-close').addEventListener('click', () => ($('device-offer').hidden = true));
@@ -407,7 +450,9 @@ function planLine(b) {
   const pack = state.config?.prices?.pack?.sessions ?? 4;
   if (b.plan === 'card') {
     const left = b.status === 'pending' ? (b.card_left == null ? t('admin.noCardFound') : t('admin.cardLeft', { n: b.card_left })) : '';
-    return [t('admin.planCard'), left].filter(Boolean).join(' · ');
+    // Confirmed without his approval: the client signed in and booked from their card.
+    const onSite = b.status === 'confirmed' && !b.approved_at ? t('admin.fromCardSite') : '';
+    return [onSite || t('admin.planCard'), left].filter(Boolean).join(' · ');
   }
   const what = b.plan === 'pack' ? t('admin.planPack', { n: pack }) : t('admin.planSingle');
   return `${what} · ${formatMoney(b.price)}`;
@@ -485,9 +530,10 @@ function renderBookings() {
 
 async function cancelBooking(b) {
   if (!confirm(t('admin.cancelConfirm', { name: b.name }))) return;
-  await guarded(() => api(`/api/admin/bookings/${b.id}/cancel`, { method: 'POST', body: {} }));
-  toast(t('admin.cancelledToast'));
+  const { cardLeft } = await guarded(() => api(`/api/admin/bookings/${b.id}/cancel`, { method: 'POST', body: {} }));
+  toast(cardLeft == null ? t('admin.cancelledToast') : t('admin.cancelledCard', { n: cardLeft }));
   loadBookings();
+  if (cardLeft != null && state.passkeys) loadClients();
 }
 
 // ---------------------------------------------------------------------------
@@ -924,6 +970,17 @@ async function openClient(id) {
       input('phone', 'admin.clientPhone', fmtPhone(client.phone), { type: 'tel', maxlength: 30, required: true }),
       input('email', 'admin.clientEmail', client.email, { type: 'email', maxlength: 120 }),
     ),
+    // Signing in on the site with Google: only with the address he connects here.
+    state.clientGoogle
+      ? el(
+          'div',
+          { class: 'field' },
+          el('label', { for: 'c-google' }, t('admin.clientGoogle')),
+          el('input', { id: 'c-google', name: 'google', type: 'email', maxlength: 120, autocomplete: 'off', value: client.google ?? '', 'aria-describedby': 'c-google-hint' }),
+          el('small', { class: 'field-hint', id: 'c-google-hint' }, t('admin.clientGoogleHint')),
+        )
+      : '',
+    client.lastSignIn ? el('p', { class: 'panel-sub' }, t('admin.lastSignInSite', { date: fmtMoment(client.lastSignIn) })) : '',
     el('div', { class: 'field' }, el('label', { for: 'c-notes' }, t('admin.clientNotes')), el('textarea', { id: 'c-notes', name: 'notes', maxlength: 2000 }, client.notes || '')),
     el(
       'div',
@@ -986,6 +1043,7 @@ async function openClient(id) {
     alertIn('client-alert');
     const data = Object.fromEntries(new FormData(form));
     const body = { name: data.name, phone: data.phone, email: data.email, notes: data.notes, cardLeft: Number(data.cardLeft) || 0 };
+    if (form.elements.google) body.google = data.google;
     try {
       await api(id ? `/api/admin/clients/${id}` : '/api/admin/clients', { method: id ? 'PUT' : 'POST', body });
       clearDraft(key);
@@ -994,8 +1052,8 @@ async function openClient(id) {
       loadClients();
     } catch (err) {
       if (err.status === 401) return showLogin();
-      if (err.status === 409) return alertIn('client-alert', 'error', t('admin.phoneTaken'));
-      if (err.status === 400) return showFieldErrors(form, err.data.fields, { cardLeft: 'admin.cardInvalid' });
+      if (err.status === 409) return alertIn('client-alert', 'error', t(err.data?.error === 'google_taken' ? 'admin.googleTakenClient' : 'admin.phoneTaken'));
+      if (err.status === 400) return showFieldErrors(form, err.data.fields, { cardLeft: 'admin.cardInvalid', google: 'errors.email' });
       alertIn('client-alert', 'error', t('common.error'));
     }
   });
@@ -1044,13 +1102,29 @@ function renderPeople() {
             'p',
             {},
             [a.last_used ? t('admin.lastSignIn', { date: fmtMoment(a.last_used) }) : t('admin.neverSignedIn'), t('admin.devices', { n: a.passkeys })].join(' · '),
+            a.google ? [' · ', el('bdi', { dir: 'ltr' }, t('admin.googleAccount', { email: a.google }))] : '',
           ),
         ),
         el(
           'div',
           { class: 'item-actions' },
           a.id === state.me
-            ? el('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: addThisDevice }, t('admin.addDevice'))
+            ? [
+                el('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: addThisDevice }, t('admin.addDevice')),
+                state.google && !a.google ? el('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: (e) => toGoogle('link', e.currentTarget) }, t('admin.googleConnect')) : '',
+                state.google && a.google
+                  ? el('button', {
+                      type: 'button',
+                      class: 'btn btn-ghost btn-sm',
+                      onclick: async () => {
+                        if (!confirm(t('admin.googleDisconnectConfirm'))) return;
+                        await guarded(() => api('/api/admin/google', { method: 'DELETE', body: {} }));
+                        toast(t('admin.googleDisconnected'));
+                        loadPeople();
+                      },
+                    }, t('admin.googleDisconnect'))
+                  : '',
+              ]
             : el('button', {
                 type: 'button',
                 class: 'btn btn-danger btn-sm',
@@ -1119,15 +1193,19 @@ onLangChange(() => {
 });
 
 Promise.all([loadConfig().catch(() => null), api('/api/admin/session')])
-  .then(([cfg, { enabled, loggedIn, access, passkeys, editor }]) => {
+  .then(async ([cfg, { enabled, loggedIn, access, passkeys, editor, google, clientGoogle }]) => {
     state.config = cfg;
     state.passkeys = Boolean(passkeys);
     state.editor = Boolean(editor);
     state.access = Boolean(access) && !state.passkeys;
     state.enabled = Boolean(enabled);
+    state.google = Boolean(google) && state.passkeys;
+    state.clientGoogle = Boolean(clientGoogle);
     $('admin-disabled').hidden = enabled;
     $('login-form').hidden = !enabled || state.passkeys;
     // Opening a one-time link always adds this phone's passkey.
-    return loggedIn && !(state.passkeys && inviteCode()) ? showDashboard() : showLogin();
+    const inside = loggedIn && !(state.passkeys && inviteCode());
+    await (inside ? showDashboard() : showLogin());
+    afterGoogle(inside);
   })
   .catch(() => showLogin());

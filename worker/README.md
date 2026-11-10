@@ -9,13 +9,14 @@ The site runs on Cloudflare's free plan:
 | The home and booking pages, with David's texts, photos and notices in them; the photos he uploads (`/media/*`) | The Worker (`worker/content.js`) | Counted in the 100,000 a day: a visit is a few requests |
 | The photos David uploads in the admin panel | Workers KV, a store named `clinic-media` (the `MEDIA` binding) | 1 GB; 100,000 reads and 1,000 writes a day |
 | The data: bookings, closed days, opening hours, messages, David's clients | Cloudflare D1, a database named `clinic` (tables in `migrations/`) | 5 GB; 5 million rows read and 100,000 written a day |
-| Signing in to the admin panel | Face ID, Touch ID or a fingerprint (passkeys, `worker/passkeys.js`), no password. A person is added with a one-time link | Free |
+| Signing in to the admin panel | Face ID, Touch ID or a fingerprint (passkeys, `worker/passkeys.js`), no password. A person is added with a one-time link. Or Google, once a manager connects their account | Free |
+| Signing in on the booking page (clients: their card and bookings) | Google (`worker/google.js`) or a code sent by SMS through Twilio Verify (`worker/sms.js`) | Google: free. SMS: about 1 ₪ a sign-in (below) |
 | Payment at booking | Grow's own secure page (`worker/grow.js`): card details never reach the site | Grow's fees only |
 | The iPhone calendar | iCloud, over CalDAV (`worker/calendar.js`) | Free |
 
 `BOOKING_MODE` in `wrangler.jsonc` decides how bookings work:
 
-- `"transfer"` (now): bookings are made on the site, and the client pays by Bit or PayBox to David's phone (058-434-4047): one session (350 ₪), the 4-session card (1,200 ₪, this session included), or a session from a card they already have (nothing to pay). The confirmation shows the number, the amount and the booking number to write in the transfer's note. The time is held until David approves it under **פגישות** (or the appointment time passes); approving adds the client to **לקוחות**, adds the card's other 3 sessions or takes one, and puts the booking in his calendar. The site can't see Bit or PayBox payments itself, so approving is by hand. Messages still go to WhatsApp.
+- `"transfer"` (now): bookings are made on the site, and the client pays by Bit or PayBox to David's phone (058-434-4047): one session (350 ₪), the 4-session card (1,200 ₪, this session included), or a session from a card they already have (nothing to pay). The confirmation shows the number, the amount and the booking number to write in the transfer's note. The time is held until David approves it under **פגישות** (or the appointment time passes); approving adds the client to **לקוחות**, adds the card's other 3 sessions or takes one, and puts the booking in his calendar. The site can't see Bit or PayBox payments itself, so approving is by hand. A client who signed in and has sessions left on their card books from it at once, without waiting for him (see "Signing in on the site" below). Cancelling a confirmed session that came off a card (or a new card's first one) puts it back on the card. Messages still go to WhatsApp.
 - `"whatsapp"`: like the first version of the site. A booking request or a message opens WhatsApp, and nothing is stored. The free times come from the opening hours, minus the days closed in the admin panel (and, once connected, minus his calendar).
 - `"pay"`: what David chose. The client books and pays in full on the site, and messages still go to WhatsApp. See "Payment at booking" below.
 - `"online"`: bookings and messages are taken and stored on the site without payment.
@@ -32,6 +33,7 @@ Ready now:
 - The iCloud calendar, tested against a real CalDAV server (Radicale).
 
 Still missing:
+- **Signing in on the site**: the database's new tables (`migrations/0006`) and Google's two settings, and Twilio's for SMS codes (below). Until then the booking page works as before, without signing in.
 - **David's Grow account**, and Grow's approval for real payments (below).
 - **An app-specific password** for his iCloud calendar (below).
 - **The domain** (the one his father has).
@@ -131,6 +133,43 @@ A photo he picks is framed on the phone in the shape it has on the site (the arc
 
 His changes are kept in D1 (`settings` → `content`, and the `notices` table) and are on the site at once: the Worker puts them into the home and booking pages as they're served (with the same security headers), and `/api/config` gives the booking page his names and prices. The old GitHub Pages address (`docs/`, from `npm run build:pages`) no longer has a copy of the site: it sends visitors to the same place on the main site (an old link to the booking page opens the booking page).
 
+## Signing in on the site (clients), and Google for managers
+
+On the booking page, above the steps, a client can sign in:
+- **With the phone**: a code by SMS to their mobile number (Israeli 05… numbers only). They see the card on that number: the client in **לקוחות** with that phone.
+- **With Google**. Google tells the site only the name and the email address; no password ever reaches the site. A Google account sees a card once (a) the client confirms their mobile number with an SMS code, or (b) David writes their Gmail address in the client's card (**לקוחות** → the client → **Gmail לכניסה לאתר**). Only he connects an address: one typed into a booking proves nothing, so it never connects a card by itself.
+
+Signed in, the client sees how many sessions are left on their card and their bookings (coming up and past; no notes, no one else's), and the form fills in their name and number. With sessions left, **a session from the card is booked at once**: confirmed, taken off the card, and put in his calendar; under **פגישות** it says **נקבע מהכרטיסייה באתר** and needs nothing from him. With no sessions left, or another phone number on the booking, it waits for his approval as before. Two bookings at the same moment can't both take a card's last session.
+
+**Managers** can sign in with Google too: under **מנהלים**, right after signing in with Face ID, **חיבור חשבון Google**. The sign-in screen then has **כניסה עם Google**. Only a Google account a manager connected opens the panel, and **ניתוק Google** (or removing the person) ends it.
+
+What's kept, in D1: Google's id for the person, their email and name; the phone number they confirmed; and only hashes of the sign-in cookies. A client stays signed in for 90 days (or until **יציאה**), a manager for 12 hours. The cookies are sent only over HTTPS, never to scripts, never from another site. Each Google sign-in is tied to the browser that started it and checked with Google itself (its signature, this site, the time, a value unique to this sign-in, and an email address Google confirmed); the code Google sends back only works with a secret kept on the server (PKCE). A visitor can ask for a few codes, tries or Google sign-ins a minute. **מחיקת הלקוח** also deletes the client's sign-ins.
+
+To turn it on:
+1. **The tables**, once: `npx wrangler d1 migrations apply clinic --remote` (it adds `migrations/0006`: new tables only, nothing existing changes). Deploys from GitHub don't run this.
+2. **Google** (free), with the clinic's Google account, at [console.cloud.google.com](https://console.cloud.google.com):
+   1. Make a project (for example "Clinic").
+   2. **Google Auth Platform → Branding**: the app's name as clients should see it ("דוד נאמן"), and a support email. Don't add a logo: that asks for Google's review, and the name and email alone need none.
+   3. **Audience**: External, then **Publish app** (until then, only listed test users can sign in).
+   4. **Clients → Create client → Web application**. Under **Authorized redirect URIs** add `https://clinic.davidneeman.workers.dev/api/auth/google/callback` (and, once the domain is set, the same with the domain).
+   5. Copy the client ID and secret into the Worker, without sending them to anyone:
+      ```sh
+      npx wrangler secret put GOOGLE_CLIENT_ID
+      npx wrangler secret put GOOGLE_CLIENT_SECRET
+      ```
+3. **SMS codes** (optional; Twilio Verify, about $0.05 a sign-in plus the SMS to Israel, roughly 1 ₪ in all), at [twilio.com](https://www.twilio.com):
+   1. Open an account and upgrade it (a trial account sends only to numbers it verified).
+   2. **Verify → Services → Create**: the name is what the SMS says ("Your … verification code is"). Keep SMS on.
+   3. **Verify → Geo permissions**: allow Israel only. Under **Billing**, a usage alert is a good idea too.
+   4. Put the account's SID and auth token (on the console's home page) and the Verify service's SID into the Worker:
+      ```sh
+      npx wrangler secret put TWILIO_ACCOUNT_SID     # AC…
+      npx wrangler secret put TWILIO_AUTH_TOKEN
+      npx wrangler secret put TWILIO_VERIFY_SERVICE  # VA…
+      ```
+
+Each way to sign in shows once its secrets are there; without Twilio, signing in is with Google only.
+
 ## The iPhone calendar (iCloud)
 
 - Anything in his calendars blocks that time on the booking page, with the usual break around it. An all-day event shown as busy (a vacation) closes the day; events shown as free, or cancelled, block nothing. Only the times are used; titles and details are never kept.
@@ -155,6 +194,8 @@ npx wrangler secret put ICLOUD_APP_PASSWORD   # the password Apple shows, once
 | `ADMIN_EMAILS` | secret, optional | Who may sign in through Access, with a comma between addresses |
 | `GROW_USER_ID`, `GROW_PAGE_CODE` | secrets | Grow's identifiers for the account (and `GROW_API_KEY` if Grow gives one) |
 | `ICLOUD_USER`, `ICLOUD_APP_PASSWORD` | secrets | His Apple ID email and the app-specific password |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | secrets | Signing in with Google (clients and managers) |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE` | secrets, optional | Signing in with a code by SMS |
 
 Secrets are set only with `npx wrangler secret put` (or in the dashboard). Never put them in this repository, in WhatsApp or in an email. Deploys never change them.
 
@@ -167,3 +208,5 @@ npm test                         # includes test/worker.test.js
 ```
 
 The local database lives in `.wrangler/`, which git ignores. To sign in to the local admin panel, run `npm run admin:invite -- http://localhost:8787` and open the link (use `localhost`, not `127.0.0.1`: passkeys need a name). `test/admin.test.js` shows how passkeys are checked.
+
+Signing in on the site is tested in `test/sign-in.test.js` against stand-ins for Google and Twilio. To try it in a browser on this computer, `GOOGLE_AUTH_URL`, `GOOGLE_TOKEN_URL`, `GOOGLE_CERTS_URL` and `TWILIO_API_URL` can point to a stand-in on `http://127.0.0.1:…` or `http://localhost:…`; the Worker uses them only for requests to `localhost`, never on the real site.
