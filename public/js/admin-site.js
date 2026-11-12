@@ -17,9 +17,11 @@ import {
   DEFAULT_GALLERY,
   DEFAULT_PHOTOS,
   GALLERY_LIMITS,
+  PAY_LINK_MAX,
   PHOTO_SLOTS,
   PRICE_LIMITS,
   SERVICE_LIMITS,
+  cleanPayLink,
   photoSource,
   serviceDefaultPhoto,
 } from './site-content.js';
@@ -96,7 +98,7 @@ function withChanges(base, p) {
     if (ref === null) delete next.photos?.[slot];
     else (next.photos ??= {})[slot] = ref;
   }
-  for (const key of ['aboutAlt', 'gallery', 'prices']) {
+  for (const key of ['aboutAlt', 'gallery', 'prices', 'payLinks']) {
     if (!(key in (p || {}))) continue;
     if (p[key] === null) delete next[key];
     else next[key] = p[key];
@@ -621,6 +623,7 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
       if (item.photo) return Boolean(v.photos?.[item.photo] || w.photos?.[item.photo] || (item.photo === 'about' && (v.aboutAlt != null || w.aboutAlt != null)));
       if (item.services) return Boolean(v.services || w.services);
       if (item.prices) return Boolean(v.prices || w.prices);
+      if (item.payLinks) return Boolean(v.payLinks || w.payLinks);
       if (item.gallery) return Boolean(v.gallery || w.gallery);
       return false;
     });
@@ -632,6 +635,7 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     if (item.photo === 'about') return aboutPhotoField(item);
     if (item.services) return servicesFields();
     if (item.prices) return pricesFields();
+    if (item.payLinks) return payLinksFields();
     if (item.gallery) return galleryFields();
     return '';
   }
@@ -941,6 +945,67 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     );
   }
 
+  // ---- His Bit and PayBox links (the booking page's buttons open them) ----
+
+  function payLinksFields() {
+    const now = s.work.payLinks || {};
+    const input = (app, label, hint) => {
+      const id = `f-pay-${app}`;
+      const value = now[app] || '';
+      const valid = cleanPayLink(value);
+      // To check it opens the app (only a link that's right).
+      const tryIt = el('a', { class: 'linklike', href: valid || undefined, target: '_blank', rel: 'noopener noreferrer', hidden: !valid }, t('admin.payLinkTry'));
+      const error = el('span', { class: 'field-error', role: 'alert', hidden: true }, t('admin.payLinkInvalid'));
+      const field = el(
+        'div',
+        { class: 'field' },
+        el('label', { for: id }, t(label)),
+        el('input', {
+          id,
+          type: 'url',
+          inputmode: 'url',
+          dir: 'ltr',
+          autocomplete: 'off',
+          autocapitalize: 'off',
+          spellcheck: 'false',
+          maxlength: PAY_LINK_MAX,
+          placeholder: 'https://',
+          value,
+          'data-field': `payLinks.${app}`,
+          'aria-describedby': `${id}-hint`,
+          oninput: (e) => {
+            const raw = e.target.value.trim();
+            const link = cleanPayLink(raw);
+            const ok = link !== null;
+            field.classList.toggle('has-error', !ok);
+            e.target.setAttribute('aria-invalid', String(!ok));
+            error.hidden = ok;
+            s.errors.delete(`payLinks.${app}`);
+            const links = { ...(s.work.payLinks || {}) };
+            if (raw) links[app] = raw;
+            else delete links[app];
+            setOwn(s.work, 'payLinks', Object.keys(links).length ? links : undefined, undefined);
+            tryIt.hidden = !link;
+            if (link) tryIt.href = link;
+            else tryIt.removeAttribute('href');
+            changed();
+          },
+        }),
+        el('small', { class: 'field-hint', id: `${id}-hint` }, t(hint), ' ', tryIt),
+        error,
+      );
+      return field;
+    };
+    return el(
+      'fieldset',
+      { class: 'service-edit pay-links-edit' },
+      el('legend', {}, t('admin.payLinksTitle')),
+      el('p', { class: 'field-hint' }, t('admin.payLinksNote')),
+      input('bit', 'admin.payLinkBit', 'admin.payLinkBitHint'),
+      input('paybox', 'admin.payLinkPaybox', 'admin.payLinkPayboxHint'),
+    );
+  }
+
   // ---- The gallery ----
 
   function galleryFields() {
@@ -1088,6 +1153,7 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
     if (w.aboutAlt !== v.aboutAlt) out.aboutAlt = w.aboutAlt ?? null;
     if (!same(w.gallery, v.gallery)) out.gallery = w.gallery ?? null;
     if (!same(w.prices, v.prices)) out.prices = w.prices ?? null;
+    if (!same(w.payLinks, v.payLinks)) out.payLinks = w.payLinks ?? null;
     return out;
   }
 

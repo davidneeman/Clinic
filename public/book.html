@@ -189,16 +189,24 @@
         <div class="check" data-icon="checkCircle"></div>
         <h2 id="confirm-title" tabindex="-1" data-i18n="book.successTitle"></h2>
         <p id="confirm-text"></p>
-        <dl id="confirm-details"></dl>
-        <!-- Paying by Bit or PayBox: where to send it; then it waits for David's approval -->
+        <!-- Paying by Bit or PayBox: where to send it (first, so it's on the screen at once); then
+             it waits for David's approval -->
         <div class="pay-transfer" id="confirm-pay" hidden>
+          <!-- His own Bit and PayBox links, once he sets them in the admin panel: the app opens
+               straight to him (book.js) -->
+          <div class="pay-apps" id="pay-apps" hidden>
+            <a class="btn btn-primary pay-app" id="pay-bit" target="_blank" rel="noopener noreferrer" data-i18n="book.payBit" hidden></a>
+            <a class="btn btn-primary pay-app" id="pay-paybox" target="_blank" rel="noopener noreferrer" data-i18n="book.payPaybox" hidden></a>
+            <p class="pay-apps-hint" id="pay-apps-hint"></p>
+          </div>
           <div class="pay-to">
-            <span data-i18n="book.payTo"></span>
+            <span id="pay-to-label" data-i18n="book.payTo"></span>
             <bdi class="pay-phone" id="pay-phone"></bdi>
             <button class="btn btn-outline btn-sm" type="button" id="copy-phone" data-i18n="book.copy"></button>
           </div>
           <p class="pay-note" id="pay-note"></p>
         </div>
+        <dl id="confirm-details"></dl>
         <p class="pay-status" id="pay-status" role="status" hidden></p>
         <p class="panel-sub" id="confirm-email" data-i18n="book.successEmail" hidden></p>
         <ul class="prep">

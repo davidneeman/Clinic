@@ -10,11 +10,13 @@
 import { dayIndex, isValidDate, isValidTime } from '../server/time.js';
 import {
   GALLERY_LIMITS,
+  PAY_APPS,
   PHOTO_SLOTS,
   PRICE_LIMITS,
   SERVICE_LIMITS,
   TEXT_FIELDS,
   cleanContentText,
+  cleanPayLink,
   contentUploads,
   isPhotoRef,
   photoSource,
@@ -261,6 +263,22 @@ export function applyContentPatch(current, patch, { services }) {
         else prices[key] = v;
       }
       next.prices = prices;
+    }
+  }
+
+  // His Bit and PayBox links (an empty one is taken off).
+  if ('payLinks' in patch) {
+    if (patch.payLinks === null) delete next.payLinks;
+    else if (!isObject(patch.payLinks)) bad.push('payLinks');
+    else {
+      const links = {};
+      for (const [app, value] of Object.entries(patch.payLinks)) {
+        const link = !PAY_APPS.includes(app) ? null : value === null ? '' : cleanPayLink(value);
+        if (link === null) bad.push(`payLinks.${app}`);
+        else if (link) links[app] = link;
+      }
+      if (Object.keys(links).length) next.payLinks = links;
+      else delete next.payLinks;
     }
   }
 

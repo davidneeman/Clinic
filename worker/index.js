@@ -434,8 +434,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         // Messages go to WhatsApp unless the site takes them itself ("online").
         handoff: mode === 'online' ? undefined : 'whatsapp',
         payments: mode === 'pay' ? true : undefined,
-        // Paying by Bit or PayBox to this number, approved by hand.
-        transfer: mode === 'transfer' ? { phone: localPhone(config.business.phone) } : undefined,
+        // Paying by Bit or PayBox to this number (or with his own links for them), approved by hand.
+        transfer: mode === 'transfer' ? { phone: localPhone(config.business.phone), ...site.payLinks } : undefined,
         closedDays,
       });
     }
@@ -550,7 +550,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       }
 
       if (transfer) {
-        return json({ booking: { ...summary, plan, price }, transfer: { phone: localPhone(config.business.phone) } }, 201);
+        return json({ booking: { ...summary, plan, price }, transfer: { phone: localPhone(config.business.phone), ...site.payLinks } }, 201);
       }
 
       if (!grow) {

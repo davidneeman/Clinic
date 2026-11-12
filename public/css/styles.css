@@ -5234,6 +5234,24 @@ html.js .reveal:not(.is-visible) {
   margin: 0;
 }
 
+/* His Bit and PayBox links: the app opens straight to him (side by side when they fit) */
+.pay-apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.pay-apps .pay-app {
+  width: 100%;
+}
+
+.pay-apps-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .pay-note .ref {
   font-weight: 700;
 }

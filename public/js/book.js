@@ -586,6 +586,21 @@ function renderConfirmation() {
   // Bit or PayBox: where to send it, and the booking's state while David hasn't approved yet.
   $('confirm-pay').hidden = !(payTo && booking.plan !== 'card' && status === 'pending');
   if (payTo) {
+    // His own Bit and PayBox links (when he set them): the app opens straight to him, and the
+    // phone number stays as the other way.
+    let apps = 0;
+    for (const app of ['bit', 'paybox']) {
+      const link = /^https:\/\//.test(payTo[app] || '') ? payTo[app] : '';
+      $(`pay-${app}`).hidden = !link;
+      if (link) {
+        $(`pay-${app}`).href = link;
+        apps++;
+      }
+    }
+    $('pay-apps').hidden = !apps;
+    $('pay-apps-hint').textContent = apps ? t('book.payAppsHint', { amount: formatPrice(booking.price) }) : '';
+    $('pay-to-label').dataset.i18n = apps ? 'book.payToOr' : 'book.payTo';
+    $('pay-to-label').textContent = t($('pay-to-label').dataset.i18n);
     $('pay-phone').textContent = payTo.phone;
     $('pay-note').replaceChildren(t('book.payNoteBefore'), el('strong', { class: 'ref' }, booking.ref));
     const statusKey = { confirmed: 'book.statusConfirmed', cancelled: 'book.statusCancelled', expired: 'book.statusCancelled' }[status] || 'book.statusPending';
@@ -635,6 +650,14 @@ function watchApproval(ref) {
     } catch {}
     if (tries >= 80) clearInterval(timer); // about 20 minutes
   }, 15_000);
+}
+
+// Opening Bit or PayBox: the booking number is copied on the way, to paste in the payment's note.
+for (const app of ['bit', 'paybox']) {
+  $(`pay-${app}`).addEventListener('click', () => {
+    const ref = confirmed?.booking?.ref;
+    if (ref) navigator.clipboard?.writeText(ref).then(() => toast(t('book.refCopied')), () => {});
+  });
 }
 
 $('copy-phone').addEventListener('click', async () => {

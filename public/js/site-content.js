@@ -35,6 +35,7 @@ export const CONTENT_SECTIONS = [
       { text: 'treatments.lead', label: { he: 'פסקת הפתיחה', en: 'Intro paragraph' }, max: 800, multiline: true, optional: true },
       { services: true },
       { prices: true },
+      { payLinks: true },
     ],
   },
   {
@@ -82,6 +83,41 @@ export const TEXT_FIELDS = CONTENT_SECTIONS.flatMap((s) => s.items.filter((i) =>
 export const SERVICE_LIMITS = { name: 40, description: 1200 };
 export const GALLERY_LIMITS = { photos: 24, alt: 160 };
 export const PRICE_LIMITS = { session: [0, 5000], packSessions: [2, 20], pack: [0, 50000] };
+// His own links for paying him in Bit and in PayBox: the booking page's buttons open them.
+export const PAY_APPS = ['bit', 'paybox'];
+export const PAY_LINK_MAX = 500;
+
+/**
+ * A link he gives for paying him (Bit's or PayBox's own): https only, a real address (not an IP
+ * number or this computer), no login details in it, at most PAY_LINK_MAX characters. → the
+ * link as it will be kept; '' for none; null when it isn't such a link.
+ */
+export function cleanPayLink(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!text) return '';
+  if (text.length > PAY_LINK_MAX || /\s/.test(text)) return null;
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    return null;
+  }
+  const host = url.hostname;
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(host) || /^[\d.]+$/.test(host)) return null;
+  return url.href.length > PAY_LINK_MAX ? null : url.href;
+}
+
+/** His payment links, as the booking page uses them: { bit, paybox } (only those he set). */
+export function payLinksOf(content = {}) {
+  const links = {};
+  for (const app of PAY_APPS) {
+    const link = cleanPayLink(content?.payLinks?.[app]);
+    if (link) links[app] = link;
+  }
+  return links;
+}
 
 // ---------------------------------------------------------------------------
 // Photos
@@ -254,6 +290,7 @@ export function mergeSiteConfig(config, content = {}, base = '') {
   return {
     ...config,
     services,
+    payLinks: payLinksOf(content),
     prices: prices
       ? { ...config.prices, session: { ...config.prices?.session, price: prices.session }, pack: { sessions: prices.packSessions, price: prices.pack } }
       : config.prices,
