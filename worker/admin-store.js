@@ -3,8 +3,6 @@
 // as hashes, so the database alone can't be used to sign in.
 
 const iso = (date) => date.toISOString();
-// What D1 says before migrations/0006 (signing in on the site) is applied.
-const NO_TABLE = /no such table/;
 
 /** A phone number as the client list keys it: digits only, Israeli numbers starting with 0. */
 export function phoneKey(phone) {
@@ -79,21 +77,14 @@ export function openAdminStore(db, clock = () => new Date()) {
             FROM admins a ORDER BY a.id`)
           .all()
       ).results,
-    /** Removes a person: their passkeys, Google account and sessions stop working at once. */
+    /** Removes a person: their passkeys and sessions stop working at once. */
     removeAdmin: async (id) => {
-      const remove = [
+      const [, , gone] = await db.batch([
         db.prepare('DELETE FROM sessions WHERE admin_id = ?').bind(id),
         db.prepare('DELETE FROM passkeys WHERE admin_id = ?').bind(id),
         db.prepare('DELETE FROM admins WHERE id = ?').bind(id),
-      ];
-      try {
-        const done = await db.batch([db.prepare('DELETE FROM admin_google WHERE admin_id = ?').bind(id), ...remove]);
-        return changed(done[done.length - 1]);
-      } catch (err) {
-        if (!NO_TABLE.test(String(err?.message))) throw err;
-        const [, , gone] = await db.batch(remove); // (before migrations/0006: no Google accounts)
-        return changed(gone);
-      }
+      ]);
+      return changed(gone);
     },
 
     // ---------- Sessions ----------
@@ -186,33 +177,13 @@ export function openAdminStore(db, clock = () => new Date()) {
         throw err;
       }
     },
-    /**
-     * Forgets a client: removed from the list, their name and details wiped from past bookings,
-     * and their sign-ins on the site gone (the accounts with the phone on their card or the Gmail
-     * he connected, and those accounts' sessions).
-     */
+    /** Forgets a client: removed from the list, and their name and details wiped from past bookings. */
     forgetClient: async (id) => {
-      const forget = [
+      const [, gone] = await db.batch([
         db.prepare("UPDATE bookings SET name = '—', phone = '', email = NULL, notes = NULL, client_id = NULL WHERE client_id = ?").bind(id),
         db.prepare('DELETE FROM clients WHERE id = ?').bind(id),
-      ];
-      const theirs = `
-        SELECT a.id FROM clients c LEFT JOIN client_google g ON g.client_id = c.id
-        JOIN accounts a ON a.phone = c.phone OR (g.email_key IS NOT NULL AND a.google_key = g.email_key)
-        WHERE c.id = ?1`;
-      try {
-        const done = await db.batch([
-          db.prepare(`DELETE FROM account_sessions WHERE account_id IN (${theirs})`).bind(id),
-          db.prepare(`DELETE FROM accounts WHERE id IN (${theirs})`).bind(id),
-          db.prepare('DELETE FROM client_google WHERE client_id = ?').bind(id),
-          ...forget,
-        ]);
-        return changed(done[done.length - 1]);
-      } catch (err) {
-        if (!NO_TABLE.test(String(err?.message))) throw err;
-        const [, gone] = await db.batch(forget); // (before migrations/0006: no sign-ins)
-        return changed(gone);
-      }
+      ]);
+      return changed(gone);
     },
   };
 }

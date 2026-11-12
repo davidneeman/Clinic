@@ -6,8 +6,6 @@ import { slotsForDay } from '../server/availability.js';
 import { addDays, toMinutes } from '../server/time.js';
 
 export class SlotTakenError extends Error {}
-/** A session from a client's card was asked for, and the card had none left a moment ago. */
-export class CardEmptyError extends Error {}
 
 // 32 letters and digits (no 0/O or 1/I), so every random byte maps evenly onto one.
 const REF_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -82,47 +80,34 @@ export function openD1Store(db, defaultSchedule, clock = () => new Date()) {
    * get the same time together. With `hold` (minutes) or `holdUntil` (a moment), the booking
    * waits for its payment as 'pending' and keeps the time until then. Throws SlotTakenError
    * when the time isn't free.
-   *
-   * With `fromCard` (a client's id), it's a session from that client's card: confirmed at once,
-   * and in the same go the card gives one session – only while it has one left, so two bookings
-   * at the same moment can't both take its last one (CardEmptyError then).
    */
-  async function createBooking(b, now, { hold = 0, holdUntil = null, busy, fromCard = null } = {}) {
+  async function createBooking(b, now, { hold = 0, holdUntil = null, busy } = {}) {
     const schedule = await getSchedule();
     const free = (await availability({ from: b.date, to: b.date, duration: b.duration, now, schedule, busy }))[b.date];
     if (!free.includes(b.time)) throw new SlotTakenError('slot not available');
 
-    const until = fromCard ? null : holdUntil ? new Date(holdUntil).toISOString() : hold > 0 ? new Date(clock().getTime() + hold * 60_000).toISOString() : null;
+    const until = holdUntil ? new Date(holdUntil).toISOString() : hold > 0 ? new Date(clock().getTime() + hold * 60_000).toISOString() : null;
     const pending = Boolean(until);
     const insert = db.prepare(`
-      INSERT INTO bookings (ref, service_id, date, time, duration, name, phone, email, notes, lang, status, price, hold_until, token, plan, client_id)
-      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?13, ?14, ?15, ?16, ?18, ?19
+      INSERT INTO bookings (ref, service_id, date, time, duration, name, phone, email, notes, lang, status, price, hold_until, token, plan)
+      SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?13, ?14, ?15, ?16, ?18
       WHERE NOT EXISTS (
         SELECT 1 FROM bookings
         WHERE date = ?3 AND ${takes('', '?17')}
           AND ?11 < ${start()} + duration + ?12
           AND ${start()} < ?11 + ?5 + ?12
-      )${fromCard ? ' AND EXISTS (SELECT 1 FROM clients WHERE id = ?19 AND card_left > 0)' : ''}
+      )
       RETURNING *`);
-    // (only once the booking above went in)
-    const takeSession = db.prepare(`
-      UPDATE clients SET card_left = card_left - 1, updated_at = datetime('now')
-      WHERE id = ?1 AND card_left > 0 AND EXISTS (SELECT 1 FROM bookings WHERE ref = ?2)`);
     for (let attempt = 1; ; attempt++) {
       try {
-        const ref = newRef();
-        const add = insert.bind(
-          ref, b.serviceId, b.date, b.time, b.duration, b.name, b.phone, b.email || null, b.notes || null, b.lang,
-          toMinutes(b.time), schedule.bufferMinutes,
-          pending ? 'pending' : 'confirmed', b.price ?? null, until, pending ? newToken() : null, nowIso(), b.plan ?? null, fromCard,
-        );
-        const row = fromCard ? ((await db.batch([add, takeSession.bind(fromCard, ref)]))[0].results?.[0] ?? null) : await add.first();
-        if (!row) {
-          if (fromCard && !(await db.prepare('SELECT 1 AS ok FROM clients WHERE id = ? AND card_left > 0').bind(fromCard).first('ok'))) {
-            throw new CardEmptyError('no sessions left on the card');
-          }
-          throw new SlotTakenError('slot not available');
-        }
+        const row = await insert
+          .bind(
+            newRef(), b.serviceId, b.date, b.time, b.duration, b.name, b.phone, b.email || null, b.notes || null, b.lang,
+            toMinutes(b.time), schedule.bufferMinutes,
+            pending ? 'pending' : 'confirmed', b.price ?? null, until, pending ? newToken() : null, nowIso(), b.plan ?? null,
+          )
+          .first();
+        if (!row) throw new SlotTakenError('slot not available');
         return row;
       } catch (err) {
         // The confirmation number is random: on the rare repeat, draw another one.

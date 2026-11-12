@@ -159,3 +159,39 @@ test('a booking never approved stops holding once its time has passed', async ()
   await worker.scheduled({}, env);
   assert.equal(env.DB.raw.prepare('SELECT status FROM bookings WHERE ref = ?').get(body.booking.ref).status, 'expired');
 });
+
+test('cancelling a confirmed session from a card (or a new card’s first one) puts it back on the card', async () => {
+  const { call, signIn, env } = setup();
+  const me = await signIn();
+  const idOf = (ref) => env.DB.raw.prepare('SELECT id FROM bookings WHERE ref = ?').get(ref).id;
+  const approve = (ref) => call(`/api/admin/bookings/${idOf(ref)}/approve`, { method: 'POST', body: {}, cookie: me });
+  const cancel = (ref) => call(`/api/admin/bookings/${idOf(ref)}/cancel`, { method: 'POST', body: {}, cookie: me });
+  const cardLeft = () => env.DB.raw.prepare('SELECT card_left FROM clients').get()?.card_left;
+
+  // A new card, approved: 3 more sessions on it; cancelled: its first session goes back too.
+  const pack = (await book(call, 'pack')).body.booking;
+  await approve(pack.ref);
+  assert.equal(cardLeft(), 3);
+  const cancelledPack = await cancel(pack.ref);
+  assert.equal(cancelledPack.status, 200);
+  assert.equal(cancelledPack.body.cardLeft, 4);
+  assert.equal(cardLeft(), 4);
+  // Cancelling it again changes nothing.
+  assert.equal((await cancel(pack.ref)).status, 404);
+  assert.equal(cardLeft(), 4);
+
+  // A session from the card, approved (one off), then cancelled (back on).
+  const fromCard = (await book(call, 'card', { time: '14:00' })).body.booking;
+  await approve(fromCard.ref);
+  assert.equal(cardLeft(), 3);
+  assert.equal((await cancel(fromCard.ref)).body.cardLeft, 4);
+
+  // Still waiting for approval: nothing was taken, so nothing goes back.
+  const waiting = (await book(call, 'card', { time: '15:30' })).body.booking;
+  assert.equal((await cancel(waiting.ref)).body.cardLeft, null);
+  // One session paid by itself: not on the card.
+  const single = (await book(call, 'single', { time: '17:00' })).body.booking;
+  await approve(single.ref);
+  assert.equal((await cancel(single.ref)).body.cardLeft, null);
+  assert.equal(cardLeft(), 4);
+});

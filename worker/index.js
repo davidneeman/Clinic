@@ -23,17 +23,11 @@
 // and the notices at the top of the site (worker/content.js). The photos he uploads are
 // served from /media/.
 //
-// Clients can sign in on the booking page, with Google (worker/google.js) or with a code sent
-// to their phone by SMS (worker/sms.js): they see the sessions left on their card and their
-// bookings, and a session from the card is confirmed at once. Managers can sign in with Google
-// too. Each is on once migrations/0006 is applied and its secrets are set.
-//
 // Setup and deployment: worker/README.md.
 
 import siteConfig from '../config/site.json' with { type: 'json' };
 import { addDays, dayIndex, isValidDate, isValidTime, nowInZone } from '../server/time.js';
 import { accessSettings, verifyAccess } from './access.js';
-import { missingTables, openAccountStore } from './accounts.js';
 import { openAdminStore, phoneKey } from './admin-store.js';
 import { addBooking as addToCalendar, busyTimes, calendarSettings, zonedToUtc } from './calendar.js';
 import {
@@ -46,11 +40,9 @@ import {
   paidTransaction,
   readNotice,
 } from './grow.js';
-import { GoogleError, authUrl as googleAuthUrl, callbackUrl, exchangeCode, googleSettings, nonceFor, verifyIdToken } from './google.js';
 import { HttpError, json, readBytes, readCookie, readJson } from './http.js';
 import { PasskeyError, hashCode, randomCode, verifyLogin, verifyRegistration } from './passkeys.js';
-import { SmsError, checkCode, isIsraeliMobile, sendCode, smsSettings } from './sms.js';
-import { CardEmptyError, SlotTakenError, openD1Store } from './store.js';
+import { SlotTakenError, openD1Store } from './store.js';
 import { mergeSiteConfig, UPLOAD_ID_RE } from '../public/js/site-content.js';
 import {
   MEDIA_MAX_BYTES,
@@ -77,20 +69,6 @@ const SESSION_HOURS = 12;
 const FRESH_MINUTES = 15;
 const sessionCookie = (token, hours = SESSION_HOURS) =>
   `${SESSION_COOKIE}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${Math.round(hours * 3600)}`;
-// A client's sign-in on the site: the same kind of cookie, for 90 days or until they sign out.
-const CLIENT_COOKIE = '__Host-client';
-const CLIENT_DAYS = 90;
-const clientCookie = (token, days = CLIENT_DAYS) =>
-  `${CLIENT_COOKIE}=${token}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${Math.round(days * 86_400)}`;
-// While signing in with Google (10 minutes at most): ties Google's answer to the browser that
-// asked for it. "Lax", since the answer comes back from Google's page.
-const OAUTH_COOKIE = '__Host-oauth';
-const oauthCookie = (value, seconds = 600) => `${OAUTH_COOKIE}=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${seconds}`;
-// What a Google sign-in is for, by the first letter of its state: a client on the booking page,
-// a manager signing in, or a manager connecting their Google account.
-const GOOGLE_FOR = { client: 'c', admin: 'a', link: 'l' };
-const GOOGLE_PURPOSE = { c: 'google-client', a: 'google-admin', l: 'google-link' };
-const CODE_RE = /^\d{4,10}$/;
 const HOLD_MINUTES = 20; // how long a time stays held while the client pays
 const RECONCILE_HOURS = 6; // how far back the scheduled check looks for unanswered payments
 const MODES = new Set(['whatsapp', 'pay', 'online', 'transfer']);
@@ -137,40 +115,6 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
   const modeOf = (env) => (MODES.has(env.BOOKING_MODE) ? env.BOOKING_MODE : 'whatsapp');
   const storeFor = (env) => openD1Store(env.DB, config.defaultSchedule, clock);
   const contentFor = (env) => openContentStore(env.DB, clock);
-  const accountsFor = (env) => openAccountStore(env.DB, clock);
-  // On this computer (wrangler dev), stand-ins for Google and Twilio may be used for testing.
-  const settingsFor = (url) => ({ local: LOCAL_HOSTS.has(url.hostname) });
-
-  // Signing in on the site needs migrations/0006 (once it's seen to be in, it stays in).
-  let signInTables = false;
-  async function signInReady(env) {
-    if (!signInTables) signInTables = await accountsFor(env).ready().catch(() => false);
-    return signInTables;
-  }
-
-  /** The ways clients can sign in now: with Google, with a code by SMS. */
-  async function signInWays(env, url, mode) {
-    if (mode === 'whatsapp' || !(await signInReady(env))) return { google: false, sms: false };
-    return { google: Boolean(googleSettings(env, settingsFor(url))), sms: Boolean(smsSettings(env, settingsFor(url))) };
-  }
-
-  /** The client signed in on the site (their account), or null. */
-  async function currentAccount(request, env) {
-    const token = readCookie(request, CLIENT_COOKIE);
-    if (!token || token.length > 100) return null;
-    try {
-      return await accountsFor(env).sessionAccount(await hashCode(token));
-    } catch (err) {
-      if (missingTables(err)) return null;
-      throw err;
-    }
-  }
-
-  async function startClientSession(env, accountId) {
-    const token = randomCode(32);
-    await accountsFor(env).addSession({ hash: await hashCode(token), accountId, days: CLIENT_DAYS });
-    return clientCookie(token);
-  }
 
   /** The site's settings with David's treatments and prices from the admin panel. */
   async function siteFor(env) {
@@ -262,18 +206,6 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     const token = randomCode(32);
     await openAdminStore(env.DB, clock).addSession({ hash: await hashCode(token), adminId, hours: SESSION_HOURS });
     return sessionCookie(token);
-  }
-
-  /** Back to one of the site's own pages (from Google's), with the cookies to set. */
-  function backTo(url, path, cookies = []) {
-    const headers = new Headers({
-      Location: new URL(path, url.origin).toString(),
-      'Cache-Control': 'no-store',
-      'Referrer-Policy': 'no-referrer',
-      'X-Content-Type-Options': 'nosniff',
-    });
-    for (const cookie of cookies) headers.append('Set-Cookie', cookie);
-    return new Response(null, { status: 303, headers });
   }
 
   /** Times taken in his calendar, or {} when it isn't connected or doesn't answer. */
@@ -501,34 +433,15 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       // for a session from a card the client already has.
       const price = transfer ? (plan === 'pack' ? site.prices.pack.price : plan === 'card' ? 0 : service.price) : grow ? service.price : null;
 
-      // A session from the card of a client signed in on the site, with one left on it: confirmed
-      // at once, without waiting for David (when the booking has the phone number on the card).
-      let fromCard = null;
-      if (transfer && plan === 'card') {
-        const account = await currentAccount(request, env);
-        const client = account && (await accountsFor(env).clientFor(account));
-        if (client && client.card_left > 0 && phoneKey(input.phone) === client.phone) fromCard = client.id;
-      }
-
       const busy = await calendarBusy(env, input.date, input.date);
-      const create = (card) =>
-        store.createBooking(
-          { ...input, duration: service.duration, price, plan },
-          now(),
-          card
-            ? { busy, fromCard: card }
-            : // Paid by hand: the time stays held until David approves (or the appointment passes).
-              { hold: grow ? HOLD_MINUTES : 0, holdUntil: transfer ? zonedToUtc(input.date, input.time, tz) : null, busy },
-        );
       let booking;
       try {
-        try {
-          booking = await create(fromCard);
-        } catch (err) {
-          if (!(err instanceof CardEmptyError)) throw err;
-          fromCard = null; // its last session went a moment ago: this one waits for David, as before
-          booking = await create(null);
-        }
+        booking = await store.createBooking(
+          { ...input, duration: service.duration, price, plan },
+          now(),
+          // Paid by hand: the time stays held until David approves (or the appointment passes).
+          { hold: grow ? HOLD_MINUTES : 0, holdUntil: transfer ? zonedToUtc(input.date, input.time, tz) : null, busy },
+        );
       } catch (err) {
         if (err instanceof SlotTakenError) throw new HttpError(409, 'slot_taken');
         throw err;
@@ -542,12 +455,6 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         name: booking.name,
         price: booking.price ?? undefined,
       };
-
-      if (fromCard) {
-        ctx?.waitUntil?.(afterConfirmed(env, store, booking)); // his calendar
-        const cardLeft = (await openAdminStore(env.DB, clock).client(fromCard))?.card_left ?? 0;
-        return json({ booking: { ...summary, plan, price: 0, status: 'confirmed' }, cardLeft }, 201);
-      }
 
       if (transfer) {
         return json({ booking: { ...summary, plan, price }, transfer: { phone: localPhone(config.business.phone), ...site.payLinks } }, 201);
@@ -618,159 +525,12 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       return json({ ok: true }, 201);
     }
 
-    // ---------- Signing in on the site: clients (and managers) with Google, clients by SMS ----------
-
-    // Who is signed in, the sessions left on their card and their bookings; and which ways to
-    // sign in are on (none until migrations/0006 is applied and Google's or Twilio's secrets are set).
-    if (route === 'GET /api/account') {
-      const ways = await signInWays(env, url, mode);
-      const account = mode === 'whatsapp' ? null : await currentAccount(request, env);
-      if (!account) return json({ ...ways, signedIn: false });
-      const accounts = accountsFor(env);
-      const client = await accounts.clientFor(account);
-      const phone = client?.phone || account.phone || null;
-      return json({
-        ...ways,
-        signedIn: true,
-        via: account.google_sub ? 'google' : 'phone',
-        name: client?.name || account.name || '',
-        email: account.google_email || client?.email || '',
-        phone,
-        // A Google account shows a card once its phone number is proven (or David connects it).
-        phoneProven: Boolean(account.phone),
-        client: client ? { cardLeft: client.card_left } : null,
-        bookings: client || phone ? await accounts.bookingsFor({ clientId: client?.id ?? null, phone, today: now().date }) : [],
-      });
-    }
-
-    if (route === 'POST /api/account/logout') {
-      const token = readCookie(request, CLIENT_COOKIE);
-      if (token) await accountsFor(env).endSession(await hashCode(token)).catch((err) => {
-        if (!missingTables(err)) throw err;
-      });
-      return json({ ok: true }, 200, { 'Set-Cookie': clientCookie('', 0) });
-    }
-
-    // To Google's sign-in page: for a client, a manager, or a manager connecting their account.
-    if (route === 'POST /api/auth/google/start') {
-      const kind = GOOGLE_FOR[body.for];
-      if (!kind) throw invalid(['for']);
-      const google = googleSettings(env, settingsFor(url));
-      if (!google || !(await signInReady(env)) || (kind === 'c' && mode === 'whatsapp')) throw notFound();
-      if (await overLimit(env.FORMS_LIMIT, `${ip} google`)) throw tooMany();
-      let handle = null;
-      if (kind === 'l') {
-        // Only right after signing in (as for saving the sign-in on another device).
-        const me = await requireAdmin(request, env);
-        if (!me.id) throw new HttpError(403, 'passkeys_only');
-        if (clock().getTime() - me.signedInAt > FRESH_MINUTES * 60_000) throw new HttpError(403, 'reauth_required');
-        handle = String(me.id);
-      } else if (kind === 'c') {
-        // A sign-in this browser already has ends once the new one is in (Google's way back
-        // can't carry its cookie, so it's noted now).
-        const old = readCookie(request, CLIENT_COOKIE);
-        if (old && old.length <= 100) handle = await hashCode(old);
-      }
-      const state = `${kind}${randomCode(16)}`;
-      const verifier = randomCode(32); // the sign-in's secret (PKCE): it never leaves the server
-      const browser = randomCode(16);
-      await openAdminStore(env.DB, clock).addChallenge({
-        id: state,
-        challenge: verifier,
-        purpose: GOOGLE_PURPOSE[kind],
-        inviteHash: await hashCode(browser),
-        handle,
-        minutes: 10,
-      });
-      const to = await googleAuthUrl(google, { state, verifier, redirectUri: callbackUrl(url.origin), lang: body.lang });
-      return json({ url: to }, 200, { 'Set-Cookie': oauthCookie(browser) });
-    }
-
-    // Back from Google's page. Only for the browser that started this sign-in, once, within
-    // 10 minutes; the answer is checked with Google itself (worker/google.js).
-    if (route === 'GET /api/auth/google/callback') {
-      const q = url.searchParams;
-      const state = String(q.get('state') || '');
-      const kind = /^[cal][\w-]{20,24}$/.test(state) ? state[0] : null;
-      const done = (status, cookies = []) => backTo(url, `${kind === 'a' || kind === 'l' ? '/admin' : '/book'}#signin=${status}`, [oauthCookie('', 0), ...cookies]);
-      if (!kind) return done('failed');
-      const challenge = await openAdminStore(env.DB, clock).takeChallenge(state, GOOGLE_PURPOSE[kind]);
-      const browser = readCookie(request, OAUTH_COOKIE);
-      if (!challenge || !browser || (await hashCode(browser)) !== challenge.invite_hash) return done('expired');
-      if (q.has('error')) return done(q.get('error') === 'access_denied' ? 'cancelled' : 'failed');
-      const google = googleSettings(env, settingsFor(url));
-      if (!google) return done('failed');
-      let who;
-      try {
-        const idToken = await exchangeCode(google, { code: q.get('code'), verifier: challenge.challenge, redirectUri: callbackUrl(url.origin) }, fetchImpl);
-        who = await verifyIdToken(google, idToken, { nonce: await nonceFor(challenge.challenge), now: clock().getTime() }, fetchImpl);
-      } catch (err) {
-        if (!(err instanceof GoogleError)) throw err;
-        log.error('Google sign-in refused:', err.message);
-        return done(err.code === 'unverified' ? 'unverified' : 'failed');
-      }
-      const accounts = accountsFor(env);
-      if (kind === 'c') {
-        const account = await accounts.googleAccount({ ...who, name: str(who.name, 80) });
-        if (challenge.handle) await accounts.endSession(challenge.handle);
-        return done('ok', [await startClientSession(env, account.id)]);
-      }
-      if (kind === 'a') {
-        // Only a manager who connected this Google account in the admin panel.
-        const adminId = await accounts.adminByGoogle(who.sub);
-        return adminId == null ? done('unknown') : done('ok', [await startSession(env, adminId)]);
-      }
-      return done(await accounts.linkAdminGoogle(Number(challenge.handle), who));
-    }
-
-    // A sign-in code by SMS (only to an Israeli mobile number).
-    if (route === 'POST /api/account/phone/start' || route === 'POST /api/account/phone/check') {
-      const sms = smsSettings(env, settingsFor(url));
-      if (!sms || mode === 'whatsapp' || !(await signInReady(env))) throw notFound();
-      const checking = route.endsWith('/check');
-      if (await overLimit(env.FORMS_LIMIT, `${ip} ${checking ? 'sms-check' : 'sms'}`)) throw tooMany();
-      const phone = phoneKey(str(body.phone, 30));
-      const code = str(body.code, 20).replace(/[\s-]+/g, '');
-      const bad = [];
-      if (!isIsraeliMobile(phone)) bad.push('phone');
-      if (checking && !CODE_RE.test(code)) bad.push('code');
-      if (bad.length) throw invalid(bad);
-      let right = false;
-      try {
-        if (!checking) {
-          await sendCode(sms, { phone, lang: body.lang }, fetchImpl);
-          return json({ ok: true });
-        }
-        right = await checkCode(sms, { phone, code }, fetchImpl);
-      } catch (err) {
-        if (!(err instanceof SmsError)) throw err;
-        if (err.code === 'phone') throw invalid(['phone']);
-        if (err.code === 'expired') throw new HttpError(400, 'code_expired', { fields: ['code'] });
-        if (err.code === 'too_many') throw tooMany();
-        log.error('Twilio failed:', err.message);
-        throw new HttpError(502, 'sms_failed');
-      }
-      if (!right) throw new HttpError(400, 'code_wrong', { fields: ['code'] });
-      const accounts = accountsFor(env);
-      const current = await currentAccount(request, env);
-      // Signed in with Google: the number is proven to be theirs, and their card shows.
-      if (current?.google_sub) {
-        await accounts.setPhone(current.id, phone);
-        return json({ ok: true });
-      }
-      const account = await accounts.phoneAccount(phone);
-      const old = readCookie(request, CLIENT_COOKIE);
-      if (old) await accounts.endSession(await hashCode(old)); // (a sign-in with another number ends)
-      return json({ ok: true }, 200, { 'Set-Cookie': await startClientSession(env, account.id) });
-    }
-
     // ---------- Admin API (behind Cloudflare Access) ----------
 
     const admins = openAdminStore(env.DB, clock);
 
     if (route === 'GET /api/admin/session') {
       const admin = await currentAdmin(request, env);
-      const ways = await signInWays(env, url, mode);
       return json({
         enabled: true,
         loggedIn: Boolean(admin),
@@ -780,10 +540,6 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         // The "האתר" tab: his texts, photos and notices (photos only once MEDIA is set up).
         editor: true,
         media: Boolean(env.MEDIA),
-        // Signing in with Google: managers, and clients on the booking page (with the Gmail he
-        // connects to a client's card).
-        google: Boolean(googleSettings(env, settingsFor(url))) && (await signInReady(env)),
-        clientGoogle: ways.google,
       });
     }
 
@@ -910,23 +666,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       }
 
       // ---------- The people who may sign in ----------
-      if (route === 'GET /api/admin/admins') {
-        const google = await accountsFor(env)
-          .adminGoogleEmails()
-          .catch((err) => {
-            if (missingTables(err)) return new Map();
-            throw err;
-          });
-        const list = (await admins.listAdmins()).map((a) => ({ ...a, google: google.get(a.id) ?? null }));
-        return json({ admins: list, me: me.id ?? null });
-      }
-
-      // Disconnecting one's own Google account (signing in with Face ID still works).
-      if (route === 'DELETE /api/admin/google') {
-        if (!me.id) throw new HttpError(403, 'passkeys_only');
-        if (!(await signInReady(env)) || !(await accountsFor(env).unlinkAdminGoogle(me.id))) throw notFound();
-        return json({ ok: true });
-      }
+      if (route === 'GET /api/admin/admins') return json({ admins: await admins.listAdmins(), me: me.id ?? null });
 
       if (route === 'POST /api/admin/invites') {
         const code = randomCode(24);
@@ -996,36 +736,16 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         if (c.phone.length < 7 || c.phone.length > 15) bad.push('phone');
         if (c.email && !EMAIL_RE.test(c.email)) bad.push('email');
         if (!Number.isInteger(c.cardLeft) || c.cardLeft < 0 || c.cardLeft > 100) bad.push('cardLeft');
-        // The Gmail address the client signs in with on the site (only when he sends it).
-        if ('google' in b) {
-          c.google = str(b.google, 120);
-          if (c.google && !EMAIL_RE.test(c.google)) bad.push('google');
-        }
         if (bad.length) throw invalid(bad);
         return c;
-      };
-      // Before saving: another client already signs in with that Gmail address.
-      const googleTaken = async (c, id = null) => Boolean(c.google) && (await signInReady(env)) && (await accountsFor(env).googleTaken(c.google, id));
-      const saveGoogle = async (c, id) => {
-        if (c.google === undefined || !(await signInReady(env))) return;
-        if (!(await accountsFor(env).setClientGoogle(id, c.google))) throw new HttpError(409, 'google_taken');
-      };
-      // What the client form shows of signing in: the Gmail he connected, and the last sign-in.
-      const signInOf = async (id) => {
-        if (!(await signInReady(env))) return {};
-        const accounts = accountsFor(env);
-        return { google: (await accounts.clientGoogle(id)) ?? '', lastSignIn: (await accounts.lastSignIn(id)) ?? null };
       };
 
       if (route === 'GET /api/admin/clients') return json({ clients: await admins.listClients(url.searchParams.get('q'), today) });
 
       if (route === 'POST /api/admin/clients') {
-        const fields = clientFields(body);
-        if (await googleTaken(fields)) throw new HttpError(409, 'google_taken');
-        const client = await admins.addClient(fields);
+        const client = await admins.addClient(clientFields(body));
         if (!client) throw new HttpError(409, 'phone_taken');
-        await saveGoogle(fields, client.id);
-        return json({ client: { ...client, ...(await signInOf(client.id)) } }, 201);
+        return json({ client }, 201);
       }
 
       const clientPath = /^\/api\/admin\/clients\/(\d{1,12})$/.exec(path);
@@ -1034,16 +754,13 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         if (method === 'GET') {
           const client = await admins.client(id);
           if (!client) throw notFound();
-          return json({ client: { ...client, ...(await signInOf(id)) }, bookings: await admins.clientBookings(id) });
+          return json({ client, bookings: await admins.clientBookings(id) });
         }
         if (method === 'PUT') {
-          const fields = clientFields(body);
-          if (await googleTaken(fields, id)) throw new HttpError(409, 'google_taken');
-          const client = await admins.updateClient(id, fields);
+          const client = await admins.updateClient(id, clientFields(body));
           if (client === false) throw new HttpError(409, 'phone_taken');
           if (!client) throw notFound();
-          await saveGoogle(fields, id);
-          return json({ client: { ...client, ...(await signInOf(id)) } });
+          return json({ client });
         }
         if (method === 'DELETE') {
           if (!(await admins.forgetClient(id))) throw notFound();
@@ -1185,11 +902,6 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     }
     await store.expireHolds();
     await openAdminStore(env.DB, clock).purge();
-    await accountsFor(env)
-      .purge()
-      .catch((err) => {
-        if (!missingTables(err)) throw err;
-      });
     // Once a day: photos he uploaded that nothing on the site uses any more.
     const at = clock();
     if (env.MEDIA && at.getUTCHours() === 2 && at.getUTCMinutes() < 10) {
