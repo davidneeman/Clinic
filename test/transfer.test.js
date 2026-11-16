@@ -54,7 +54,7 @@ const slotsOn = async (call, date) =>
 test('transfer mode: the config tells the booking page where to pay; messages still go to WhatsApp', async () => {
   const { call } = setup();
   const { body } = await call('/api/config');
-  assert.deepEqual(body.transfer, { phone: '058-434-4047' });
+  assert.deepEqual(body.transfer, { phone: '058-434-4047', bit: config.payLinks.bit });
   assert.equal(body.handoff, 'whatsapp');
   assert.equal(body.payments, undefined);
   assert.equal(body.services.find((s) => s.id === 'stress').name.he, 'דיקור סטרס');
@@ -72,7 +72,7 @@ test('a booking needs a plan, and each plan has its price', async () => {
   assert.equal(single.status, 201);
   assert.equal(single.body.booking.price, 350);
   assert.equal(single.body.booking.plan, 'single');
-  assert.deepEqual(single.body.transfer, { phone: '058-434-4047' });
+  assert.deepEqual(single.body.transfer, { phone: '058-434-4047', bit: config.payLinks.bit });
   assert.match(single.body.booking.ref, /^[A-Z2-9]{6}$/);
 
   const pack = await book(call, 'pack', { time: '14:00' });

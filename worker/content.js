@@ -277,8 +277,7 @@ export function applyContentPatch(current, patch, { services }) {
         if (link === null) bad.push(`payLinks.${app}`);
         else if (link) links[app] = link;
       }
-      if (Object.keys(links).length) next.payLinks = links;
-      else delete next.payLinks;
+      next.payLinks = links; // (none at all, when he takes them all off: not even the site's own)
     }
   }
 

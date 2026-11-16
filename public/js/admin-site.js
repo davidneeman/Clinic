@@ -948,7 +948,9 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
   // ---- His Bit and PayBox links (the booking page's buttons open them) ----
 
   function payLinksFields() {
-    const now = s.work.payLinks || {};
+    // The site's own links (config/site.json) until he saves his: then his, even none at all.
+    const d = s.defaults?.payLinks || {};
+    const now = s.work.payLinks ?? d;
     const input = (app, label, hint) => {
       const id = `f-pay-${app}`;
       const value = now[app] || '';
@@ -981,10 +983,10 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
             e.target.setAttribute('aria-invalid', String(!ok));
             error.hidden = ok;
             s.errors.delete(`payLinks.${app}`);
-            const links = { ...(s.work.payLinks || {}) };
+            const links = { ...(s.work.payLinks ?? d) };
             if (raw) links[app] = raw;
             else delete links[app];
-            setOwn(s.work, 'payLinks', Object.keys(links).length ? links : undefined, undefined);
+            setOwn(s.work, 'payLinks', links, d);
             tryIt.hidden = !link;
             if (link) tryIt.href = link;
             else tryIt.removeAttribute('href');
@@ -1003,6 +1005,21 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
       el('p', { class: 'field-hint' }, t('admin.payLinksNote')),
       input('bit', 'admin.payLinkBit', 'admin.payLinkBitHint'),
       input('paybox', 'admin.payLinkPaybox', 'admin.payLinkPayboxHint'),
+      s.work.payLinks && Object.keys(d).length
+        ? el(
+            'button',
+            {
+              type: 'button',
+              class: 'linklike',
+              onclick: () => {
+                delete s.work.payLinks;
+                changed();
+                renderEditor();
+              },
+            },
+            t('admin.toOriginal'),
+          )
+        : '',
     );
   }
 

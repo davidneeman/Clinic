@@ -79,6 +79,9 @@
       "price": 1200
     }
   },
+  "payLinks": {
+    "bit": "https://www.bitpay.co.il/app/me/4C06F900-F486-DDEA-B49E-3E5FB4EE68BC72F0"
+  },
   "defaultSchedule": {
     "weeklyHours": {
       "0": [

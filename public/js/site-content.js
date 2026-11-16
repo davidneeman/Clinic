@@ -109,11 +109,17 @@ export function cleanPayLink(value) {
   return url.href.length > PAY_LINK_MAX ? null : url.href;
 }
 
-/** His payment links, as the booking page uses them: { bit, paybox } (only those he set). */
-export function payLinksOf(content = {}) {
+/**
+ * His payment links, as the booking page uses them: { bit, paybox } (only those set). The ones
+ * he saved in the admin panel (none, if he took them all off), or else the site's own
+ * (config/site.json → payLinks).
+ */
+export function payLinksOf(content = {}, defaults = {}) {
+  const mine = content?.payLinks;
+  const source = mine && typeof mine === 'object' && !Array.isArray(mine) ? mine : defaults || {};
   const links = {};
   for (const app of PAY_APPS) {
-    const link = cleanPayLink(content?.payLinks?.[app]);
+    const link = cleanPayLink(source[app]);
     if (link) links[app] = link;
   }
   return links;
@@ -290,7 +296,7 @@ export function mergeSiteConfig(config, content = {}, base = '') {
   return {
     ...config,
     services,
-    payLinks: payLinksOf(content),
+    payLinks: payLinksOf(content, config.payLinks),
     prices: prices
       ? { ...config.prices, session: { ...config.prices?.session, price: prices.session }, pack: { sessions: prices.packSessions, price: prices.pack } }
       : config.prices,

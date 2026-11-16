@@ -43,7 +43,7 @@ import {
 import { HttpError, json, readBytes, readCookie, readJson } from './http.js';
 import { PasskeyError, hashCode, randomCode, verifyLogin, verifyRegistration } from './passkeys.js';
 import { SlotTakenError, openD1Store } from './store.js';
-import { mergeSiteConfig, UPLOAD_ID_RE } from '../public/js/site-content.js';
+import { mergeSiteConfig, payLinksOf, UPLOAD_ID_RE } from '../public/js/site-content.js';
 import {
   MEDIA_MAX_BYTES,
   applyContentPatch,
@@ -693,6 +693,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
           defaults: {
             services: config.services.map((s) => ({ id: s.id, name: s.name.he, description: s.description.he, image: s.image })),
             prices: { session: config.prices.session.price, packSessions: config.prices.pack.sessions, pack: config.prices.pack.price },
+            payLinks: payLinksOf({}, config.payLinks),
           },
         });
       }

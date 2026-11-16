@@ -1,5 +1,6 @@
-// David's own Bit and PayBox links (the admin panel's "האתר" tab): the booking page's buttons
-// open them after a booking paid by Bit or PayBox. Only https links are kept.
+// David's own Bit and PayBox links: the booking page's buttons open them after a booking paid by
+// Bit or PayBox. The site comes with his Bit link (config/site.json → payLinks); what he saves in
+// the admin panel's "האתר" tab replaces it (none at all, too). Only https links are kept.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +13,11 @@ const config = JSON.parse(fs.readFileSync(new URL('../config/site.json', import.
 const silent = { info() {}, error() {}, warn() {} };
 const BIT = 'https://www.bitpay.co.il/app/me/ABCDEF12';
 const PAYBOX = 'https://payboxapp.com/paylink/david-neeman';
+const SITE_BIT = config.payLinks.bit; // the one the site comes with
 
-async function setup() {
+async function setup({ site = config } = {}) {
   const env = { DB: fakeD1(), BOOKING_MODE: 'transfer' };
-  const worker = createWorker({ config, clock: () => new Date('2026-10-01T05:00:00Z'), log: silent });
+  const worker = createWorker({ config: site, clock: () => new Date('2026-10-01T05:00:00Z'), log: silent });
   env.DB.raw.prepare("INSERT INTO admins (name, handle) VALUES ('דוד', 'h1')").run();
   env.DB.raw.prepare('INSERT INTO sessions (id_hash, admin_id, expires_at) VALUES (?, 1, ?)').run(await hashCode('session-token'), '2026-12-01T00:00:00.000Z');
   const call = async (path, { method = 'GET', body, admin = false } = {}) => {
@@ -39,8 +41,20 @@ async function setup() {
   return { env, call, save, book };
 }
 
-test('without links: the booking page shows the phone number only, as before', async () => {
+test('the site comes with his Bit link: the button shows until he changes it', async () => {
+  assert.match(SITE_BIT, /^https:\/\/www\.bitpay\.co\.il\/app\/me\/[\w-]+$/);
   const { call, book } = await setup();
+  assert.deepEqual((await call('/api/config')).body.transfer, { phone: '058-434-4047', bit: SITE_BIT });
+  assert.deepEqual((await book('12:30')).body.transfer, { phone: '058-434-4047', bit: SITE_BIT });
+  // The admin panel shows it as the original, with nothing of his saved yet.
+  const admin = (await call('/api/admin/content', { admin: true })).body;
+  assert.deepEqual(admin.defaults.payLinks, { bit: SITE_BIT });
+  assert.equal(admin.content.payLinks, undefined);
+});
+
+test('a site without links of its own: the phone number only, as before', async () => {
+  const { payLinks, ...site } = config;
+  const { call, book } = await setup({ site });
   assert.deepEqual((await call('/api/config')).body.transfer, { phone: '058-434-4047' });
   assert.deepEqual((await book('12:30')).body.transfer, { phone: '058-434-4047' });
 });
@@ -58,11 +72,15 @@ test('his links: kept, and given with the payment details (with the phone number
   // The admin panel reads them back as saved.
   assert.deepEqual((await call('/api/admin/content', { admin: true })).body.content.payLinks, { bit: BIT, paybox: PAYBOX });
 
-  // One taken off: only the other stays. Both: none.
+  // One taken off: only the other stays (the site's own Bit link doesn't come back by itself).
   assert.deepEqual((await save({ paybox: PAYBOX, bit: '' })).body.content.payLinks, { paybox: PAYBOX });
   assert.deepEqual((await call('/api/config')).body.transfer, { phone: '058-434-4047', paybox: PAYBOX });
-  assert.equal((await save(null)).body.content.payLinks, undefined);
+  // Both taken off: none at all, as he chose.
+  assert.deepEqual((await save({})).body.content.payLinks, {});
   assert.deepEqual((await call('/api/config')).body.transfer, { phone: '058-434-4047' });
+  // "Back to the original": the site's own again.
+  assert.equal((await save(null)).body.content.payLinks, undefined);
+  assert.deepEqual((await call('/api/config')).body.transfer, { phone: '058-434-4047', bit: SITE_BIT });
 });
 
 test('only a real https link is kept; anything else is refused and nothing changes', async () => {
