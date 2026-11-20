@@ -1,5 +1,6 @@
-import { api, clearFieldErrors, el, loadConfig, locale, onLangChange, pick, showFieldErrors, t, toast } from './site.js';
+import { api, clearFieldErrors, el, getLang, loadConfig, locale, onLangChange, pick, showFieldErrors, t, toast } from './site.js';
 import { svg } from './icons.js';
+import { dictionaries } from './i18n.js';
 import { createSiteTab } from './admin-site.js';
 import { choiceSelect, clearDraft, draftNames, draftWhen, formatRange, loadDraft, rangeDates, rangeField, rangeParts, saveDraft, shiftDays, timeSelect, todayIn } from './admin-pickers.js';
 
@@ -414,12 +415,82 @@ function planLine(b) {
 }
 const formatMoney = (n) => `${Number(n || 0).toLocaleString('he-IL')} ₪`;
 
+// ---------------------------------------------------------------------------
+// WhatsApp: a message to the client, already written; David only presses send
+// ---------------------------------------------------------------------------
+
+/** A text in the language the client booked in. */
+function clientText(b, key, vars = {}) {
+  const text = dictionaries[b.lang === 'en' ? 'en' : 'he'].admin[key] ?? '';
+  return String(text).replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ''));
+}
+/** The phone number as WhatsApp takes it (972…), or '' when there's none. */
+function waNumber(phone) {
+  let d = String(phone || '').replace(/\D+/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  else if (d.startsWith('0')) d = `972${d.slice(1)}`;
+  if (d.startsWith('9720')) d = `972${d.slice(4)}`; // (+972 050…)
+  return d.length >= 9 ? d : '';
+}
+const waLink = (phone, text) => (waNumber(phone) ? `https://wa.me/${waNumber(phone)}?text=${encodeURIComponent(text)}` : '');
+const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || '';
+function waWhen(b) {
+  const [y, m, d] = b.date.split('-').map(Number);
+  return new Intl.DateTimeFormat(b.lang === 'en' ? 'en-GB' : 'he-IL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+/** How many sessions are left on the client's card (for a booking from it, or a new one). */
+function cardLine(b, n) {
+  if (n == null || !['card', 'pack'].includes(b.plan)) return '';
+  return n > 1 ? clientText(b, 'waCardLeft', { n }) : n === 1 ? clientText(b, 'waCardLeftOne') : clientText(b, 'waCardLast');
+}
+function approvedMessage(b, cardLeft) {
+  const vars = { name: firstName(b.name), when: waWhen(b), time: b.time };
+  return [clientText(b, b.plan === 'card' ? 'waApprovedFromCard' : 'waApproved', vars), cardLine(b, cardLeft), clientText(b, 'waSeeYou')].filter(Boolean).join(' ');
+}
+function cancelledMessage(b, cardLeft) {
+  const vars = { name: firstName(b.name), when: waWhen(b), time: b.time };
+  return [clientText(b, 'waCancelled', vars), cardLeft != null ? clientText(b, 'waCardBack', { n: cardLeft }) : '', clientText(b, 'waRebook', { link: `${location.origin}/book` })]
+    .filter(Boolean)
+    .join(' ');
+}
+function reminderMessage(b) {
+  const today = todayIn(state.config?.timezone || 'Asia/Jerusalem');
+  const day = b.date === today ? clientText(b, 'waToday') : b.date === shiftDays(today, 1) ? clientText(b, 'waTomorrow') : clientText(b, 'waOn', { when: waWhen(b) });
+  return clientText(b, 'waReminder', { name: firstName(b.name), day, time: b.time });
+}
+const waButton = (link, label, cls) =>
+  el('a', { class: `btn ${cls} btn-sm`, href: link, target: '_blank', rel: 'noopener noreferrer' }, el('span', { class: 'wa-icon', html: svg('whatsapp') }), label);
+
+/** After approving or cancelling: the message to the client, one tap away. */
+function offerMessage(kind, b, cardLeft) {
+  const box = $('follow-up');
+  if (!box) return;
+  const link = waLink(b.phone, kind === 'approved' ? approvedMessage(b, cardLeft) : cancelledMessage(b, cardLeft));
+  if (!link) {
+    box.hidden = true;
+    return;
+  }
+  // (in Hebrew, "ל" before a name in other letters takes a hyphen: ל-Dana)
+  const to = getLang() === 'he' && !/^[\u0590-\u05FF]/.test(firstName(b.name)) ? `-${firstName(b.name)}` : firstName(b.name);
+  const send = waButton(link, t('admin.waTell', { name: to }), 'btn-primary');
+  send.addEventListener('click', () => setTimeout(() => (box.hidden = true), 500));
+  box.replaceChildren(
+    el('p', {}, t(kind === 'approved' ? 'admin.followApproved' : 'admin.followCancelled', { name: b.name })),
+    el('div', { class: 'toolbar' }, send, el('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => (box.hidden = true) }, t('admin.close'))),
+  );
+  box.hidden = false;
+  // (the list is drawn again, so the button pressed is gone: on to the next thing to do)
+  send.focus({ preventScroll: true });
+  box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
 async function approveBooking(b) {
   const ask = b.plan === 'card' ? t('admin.approveCardConfirm', { name: b.name }) : t('admin.approveConfirm', { name: b.name, amount: formatMoney(b.price) });
   if (!confirm(ask)) return;
   try {
-    const { cardLeft } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
+    const { booking, cardLeft } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
     toast(cardLeft == null ? t('admin.approved') : `${t('admin.approved')} · ${t('admin.cardLeft', { n: cardLeft })}`);
+    offerMessage('approved', booking, cardLeft);
   } catch (err) {
     if (err.status === 401) return showLogin();
     toast(t(err.data?.error === 'slot_taken' ? 'admin.approveTaken' : 'common.error'));
@@ -474,6 +545,8 @@ function renderBookings() {
           b.status === 'pending' && state.scope === 'upcoming'
             ? el('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => approveBooking(b) }, t(b.plan === 'card' ? 'admin.approveCard' : 'admin.approve'))
             : '',
+          // A reminder to the client, written and ready.
+          b.status === 'confirmed' && state.scope === 'upcoming' && waNumber(b.phone) ? waButton(waLink(b.phone, reminderMessage(b)), t('admin.waRemind'), 'btn-outline') : '',
           ['confirmed', 'pending'].includes(b.status) && state.scope === 'upcoming'
             ? el('button', { type: 'button', class: 'btn btn-danger btn-sm', onclick: () => cancelBooking(b) }, t('admin.cancel'))
             : '',
@@ -485,8 +558,9 @@ function renderBookings() {
 
 async function cancelBooking(b) {
   if (!confirm(t('admin.cancelConfirm', { name: b.name }))) return;
-  const { cardLeft } = await guarded(() => api(`/api/admin/bookings/${b.id}/cancel`, { method: 'POST', body: {} }));
+  const { booking, cardLeft } = await guarded(() => api(`/api/admin/bookings/${b.id}/cancel`, { method: 'POST', body: {} }));
   toast(cardLeft == null ? t('admin.cancelledToast') : t('admin.cancelledCard', { n: cardLeft }));
+  offerMessage('cancelled', booking, cardLeft);
   loadBookings();
   if (cardLeft != null && state.passkeys) loadClients();
 }
@@ -1106,6 +1180,7 @@ onSave($('invite-form'), async () => {
 // ---------------------------------------------------------------------------
 
 onLangChange(() => {
+  if ($('follow-up')) $('follow-up').hidden = true; // (written in the language it was shown in)
   if ($('dashboard').hidden) return;
   renderBookings();
   if (state.schedule) {

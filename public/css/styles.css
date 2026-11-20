@@ -5782,17 +5782,25 @@ html.js .reveal:not(.is-visible) {
   color: var(--ink);
 }
 
-/* Signed in with the phone on a computer: the offer to save the sign-in here */
-.device-offer {
+/* Signed in with the phone on a computer: the offer to save the sign-in here; and after approving
+   or cancelling, the message to the client on WhatsApp */
+.device-offer,
+.follow-up {
   margin-bottom: 16px;
 }
 
-.device-offer p {
+.device-offer p,
+.follow-up p {
   margin: 0 0 12px;
 }
 
-.device-offer .toolbar {
+.device-offer .toolbar,
+.follow-up .toolbar {
   margin-bottom: 0;
+}
+
+.wa-icon {
+  display: inline-flex;
 }
 
 /* Bookings paid by Bit or PayBox: what for, and those waiting for approval */
@@ -6151,6 +6159,17 @@ html.js .reveal:not(.is-visible) {
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.5;
+}
+
+/* A link in a field's hint ("בדיקת הקישור"): a bigger area to tap, looking the same */
+.field-hint .linklike {
+  position: relative;
+}
+
+.field-hint .linklike::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
 }
 
 .minihead {

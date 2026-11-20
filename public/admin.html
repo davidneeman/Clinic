@@ -106,6 +106,8 @@
       <!-- Bookings -->
       <div role="tabpanel" id="panel-bookings" aria-labelledby="tab-bookings">
         <p class="tab-intro" data-i18n="admin.introBookings"></p>
+        <!-- After approving or cancelling: a WhatsApp message to the client, written and ready (admin.js) -->
+        <div class="panel follow-up" id="follow-up" hidden></div>
         <div class="toolbar" id="booking-scopes">
           <button class="btn btn-outline btn-sm" type="button" data-scope="upcoming" aria-pressed="true" data-i18n="admin.upcoming"></button>
           <button class="btn btn-outline btn-sm" type="button" data-scope="past" aria-pressed="false" data-i18n="admin.past"></button>
