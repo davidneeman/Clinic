@@ -259,9 +259,11 @@ export function applyContentPatch(current, patch, { services }) {
       const prices = {};
       for (const [key, [min, max]] of Object.entries(PRICE_LIMITS)) {
         const v = patch.prices[key];
+        if (key === 'deposit' && v === undefined) continue; // (came later: without it, the site's own)
         if (!Number.isInteger(v) || v < min || v > max) bad.push(`prices.${key}`);
         else prices[key] = v;
       }
+      if (prices.deposit > prices.session) bad.push('prices.deposit');
       next.prices = prices;
     }
   }

@@ -410,6 +410,11 @@ function planLine(b) {
     const left = b.status === 'pending' ? (b.card_left == null ? t('admin.noCardFound') : t('admin.cardLeft', { n: b.card_left })) : '';
     return [t('admin.planCard'), left].filter(Boolean).join(' · ');
   }
+  if (b.plan === 'deposit') {
+    // The rest is paid at the session: the treatment's price less the deposit.
+    const full = state.config?.services.find((s) => s.id === b.service_id)?.price ?? state.config?.prices?.session?.price ?? 0;
+    return t('admin.planDeposit', { amount: formatMoney(b.price), rest: formatMoney(Math.max(0, full - b.price)) });
+  }
   const what = b.plan === 'pack' ? t('admin.planPack', { n: pack }) : t('admin.planSingle');
   return `${what} · ${formatMoney(b.price)}`;
 }
@@ -539,6 +544,8 @@ function renderBookings() {
                 b.status === 'pending' ? el('span', { class: 'chip-waiting' }, t('admin.awaitingPayment')) : '',
                 b.status === 'pending' ? ' ' : '',
                 planLine(b),
+                // A "first treatment" from a number he already has: his call before approving.
+                b.known_client ? el('span', { class: 'chip-known' }, t('admin.knownClient')) : '',
               )
             : '',
           b.notes ? el('p', { class: 'item-notes' }, b.notes) : '',

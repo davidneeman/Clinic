@@ -77,6 +77,9 @@
     "pack": {
       "sessions": 4,
       "price": 1200
+    },
+    "deposit": {
+      "price": 100
     }
   },
   "payLinks": {

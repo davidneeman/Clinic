@@ -7,7 +7,7 @@
 //     services: { "stress": { name, description, photo } },  ← per treatment (config/site.json)
 //     photos:   { hero: <photo>, about: <photo> },  aboutAlt: "…",
 //     gallery:  [{ photo: <photo>, alt: "…" }, …],
-//     prices:   { session: 350, packSessions: 4, pack: 1200 } }
+//     prices:   { session: 350, packSessions: 4, pack: 1200, deposit: 100 } }
 // where a <photo> is { builtin: "david-2" } (a photo that comes with the site, in images/) or
 // { upload: "<id>" } (one he uploaded from his phone; served from /media/).
 // Anything missing stays as it comes with the site.
@@ -82,7 +82,7 @@ export const TEXT_FIELDS = CONTENT_SECTIONS.flatMap((s) => s.items.filter((i) =>
 // The treatments' own fields (per treatment in config/site.json).
 export const SERVICE_LIMITS = { name: 40, description: 1200 };
 export const GALLERY_LIMITS = { photos: 24, alt: 160 };
-export const PRICE_LIMITS = { session: [0, 5000], packSessions: [2, 20], pack: [0, 50000] };
+export const PRICE_LIMITS = { session: [0, 5000], packSessions: [2, 20], pack: [0, 50000], deposit: [0, 5000] };
 // His own links for paying him in Bit and in PayBox: the booking page's buttons open them.
 export const PAY_APPS = ['bit', 'paybox'];
 export const PAY_LINK_MAX = 500;
@@ -298,7 +298,13 @@ export function mergeSiteConfig(config, content = {}, base = '') {
     services,
     payLinks: payLinksOf(content, config.payLinks),
     prices: prices
-      ? { ...config.prices, session: { ...config.prices?.session, price: prices.session }, pack: { sessions: prices.packSessions, price: prices.pack } }
+      ? {
+          ...config.prices,
+          session: { ...config.prices?.session, price: prices.session },
+          pack: { sessions: prices.packSessions, price: prices.pack },
+          // (prices he saved before there was a deposit: the site's own)
+          deposit: { price: Number.isInteger(prices.deposit) ? prices.deposit : (config.prices?.deposit?.price ?? 0) },
+        }
       : config.prices,
   };
 }

@@ -5808,7 +5808,8 @@ html.js .reveal:not(.is-visible) {
   margin-top: 4px !important;
 }
 
-.chip-waiting {
+.chip-waiting,
+.chip-known {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
@@ -5816,6 +5817,13 @@ html.js .reveal:not(.is-visible) {
   color: var(--accent-ink);
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+/* A first-treatment deposit from a number already in his list */
+.chip-known {
+  margin-inline-start: 6px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
 }
 
 /* Clients and admins: rows without a date box */

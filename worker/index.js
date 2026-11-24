@@ -74,7 +74,7 @@ const HOLD_MINUTES = 20; // how long a time stays held while the client pays
 const RECONCILE_HOURS = 6; // how far back the scheduled check looks for unanswered payments
 const MODES = new Set(['whatsapp', 'pay', 'online', 'transfer']);
 // What a client can pay for when paying by Bit or PayBox ("transfer").
-const PLANS = new Set(['single', 'pack', 'card']);
+const PLANS = new Set(['single', 'pack', 'card', 'deposit']);
 /** "+972 58-434-4047" → "058-434-4047", the way people type it into Bit or PayBox. */
 const localPhone = (phone) => String(phone || '').replace(/^\+972[\s-]*/, '0');
 // The pages that come with David's content in them (the others are served as they are).
@@ -442,11 +442,17 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       if (input.email && !EMAIL_RE.test(input.email)) bad.push('email');
       if (b.consent !== true) bad.push('consent');
       const plan = transfer ? (PLANS.has(b.plan) ? b.plan : null) : null;
-      if (transfer && !plan) bad.push('plan');
+      // A first treatment: a deposit now (the rest at the session), while he offers one.
+      const deposit = site.prices.deposit?.price;
+      if (transfer && (!plan || (plan === 'deposit' && !(deposit > 0 && service && deposit < service.price)))) bad.push('plan');
       if (bad.length) throw invalid(bad);
-      // Bit or PayBox: one session, the card of sessions (this one included), or nothing now
-      // for a session from a card the client already has.
-      const price = transfer ? (plan === 'pack' ? site.prices.pack.price : plan === 'card' ? 0 : service.price) : grow ? service.price : null;
+      // Bit or PayBox: one session, the card of sessions (this one included), the deposit for a
+      // first treatment, or nothing now for a session from a card the client already has.
+      const price = transfer
+        ? { pack: site.prices.pack.price, card: 0, deposit }[plan] ?? service.price
+        : grow
+          ? service.price
+          : null;
 
       const busy = await calendarBusy(env, input.date, input.date);
       let booking;
@@ -707,7 +713,12 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
           // As they come with the site, for "back to the original"
           defaults: {
             services: config.services.map((s) => ({ id: s.id, name: s.name.he, description: s.description.he, image: s.image })),
-            prices: { session: config.prices.session.price, packSessions: config.prices.pack.sessions, pack: config.prices.pack.price },
+            prices: {
+              session: config.prices.session.price,
+              packSessions: config.prices.pack.sessions,
+              pack: config.prices.pack.price,
+              deposit: config.prices.deposit?.price ?? 0,
+            },
             payLinks: payLinksOf({}, config.payLinks),
           },
         });
@@ -789,6 +800,9 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         // A session from a card: how many the client has left, to check before approving.
         for (const b of bookings) {
           if (b.plan === 'card' && b.status === 'pending') b.card_left = (await admins.clientByPhone(b.phone))?.card_left ?? null;
+          // A deposit for a first treatment, from a number already in his list: he sees it before
+          // approving. (Only here: the booking page never tells anyone whether a number is known.)
+          if (b.plan === 'deposit' && b.status === 'pending') b.known_client = Boolean(await admins.clientByPhone(b.phone));
         }
         return json({ bookings });
       }

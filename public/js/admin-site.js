@@ -891,7 +891,8 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
 
   function pricesFields() {
     const d = s.defaults?.prices || {};
-    const now = s.work.prices || d;
+    // (prices he saved before there was a deposit: the site's own deposit)
+    const now = s.work.prices ? { deposit: d.deposit, ...s.work.prices } : d;
     const input = (key, label) => {
       const [min, max] = PRICE_LIMITS[key];
       const id = `f-price-${key}`;
@@ -908,9 +909,10 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
           step: 1,
           value: String(now[key] ?? ''),
           'data-field': `prices.${key}`,
+          'aria-describedby': key === 'deposit' ? 'f-price-deposit-hint' : undefined,
           oninput: (e) => {
             const prices = { ...(s.work.prices || d), [key]: e.target.value === '' ? NaN : Number(e.target.value) };
-            const ok = Number.isInteger(prices[key]) && prices[key] >= min && prices[key] <= max;
+            const ok = Number.isInteger(prices[key]) && prices[key] >= min && prices[key] <= max && (key !== 'deposit' || prices.deposit <= prices.session);
             field.classList.toggle('has-error', !ok);
             e.target.setAttribute('aria-invalid', String(!ok));
             s.errors.delete(`prices.${key}`);
@@ -927,6 +929,8 @@ export function createSiteTab({ getConfig, onUnauthorized, onClosedDaysChanged }
       el('legend', {}, t('admin.pricesTitle')),
       el('div', { class: 'form-row form-row-3' }, input('session', 'admin.priceSession'), input('packSessions', 'admin.pricePackSessions'), input('pack', 'admin.pricePack')),
       el('small', { class: 'field-hint' }, t('admin.pricesNote')),
+      el('div', { class: 'form-row form-row-3' }, input('deposit', 'admin.priceDeposit')),
+      el('small', { class: 'field-hint', id: 'f-price-deposit-hint' }, t('admin.priceDepositHint')),
       s.work.prices
         ? el(
             'button',

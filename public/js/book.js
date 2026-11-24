@@ -332,17 +332,28 @@ const viaPayment = () => state.config?.payments === true;
 // for David to see the payment and approve it.
 const viaTransfer = () => Boolean(state.config?.transfer);
 const selectedPlan = () => document.querySelector('#plan-options input[name="plan"]:checked')?.value || 'single';
+const sessionPrice = () => state.service?.price ?? state.config.prices.session.price;
 function planAmount(plan) {
   const prices = state.config.prices;
-  return plan === 'pack' ? prices.pack.price : plan === 'card' ? 0 : (state.service?.price ?? prices.session.price);
+  return plan === 'pack' ? prices.pack.price : plan === 'card' ? 0 : plan === 'deposit' ? (prices.deposit?.price ?? 0) : sessionPrice();
 }
-const planPrice = (plan) => (plan === 'card' ? t('book.fromCard') : formatPrice(planAmount(plan)));
+/** A deposit for a first treatment, while he offers one (less than the session itself). */
+const depositOffered = () => planAmount('deposit') > 0 && planAmount('deposit') < sessionPrice();
+const planPrice = (plan) =>
+  plan === 'card'
+    ? t('book.fromCard')
+    : plan === 'deposit'
+      ? t('book.depositPrice', { amount: formatPrice(planAmount('deposit')), rest: formatPrice(sessionPrice() - planAmount('deposit')) })
+      : formatPrice(planAmount(plan));
 
 function renderPlans() {
   if (!viaTransfer()) return;
   const { pack } = state.config.prices;
   $('plan-pack-name').textContent = t('prices.pack', { n: pack.sessions });
   $('plan-pack-sub').textContent = t('book.planPackSub', { n: pack.sessions - 1 });
+  $('plan-deposit').hidden = !depositOffered();
+  $('plan-deposit-sub').textContent = t('book.planDepositSub', { rest: formatPrice(sessionPrice() - planAmount('deposit')) });
+  if (!depositOffered() && selectedPlan() === 'deposit') document.querySelector('#plan-options input[value="single"]').checked = true;
   for (const node of document.querySelectorAll('[data-plan-price]')) node.textContent = formatPrice(planAmount(node.dataset.planPrice));
 }
 const isFullName = (name) => name.trim().split(/\s+/).filter((w) => w.replace(/[^\p{L}\p{N}]/gu, '').length >= 2).length >= 2;
@@ -508,7 +519,9 @@ function renderConfirmation() {
   $('confirm-text').textContent = payTo
     ? booking.plan === 'card'
       ? t('book.transferCardText')
-      : t('book.transferText', { amount: formatPrice(booking.price) })
+      : booking.plan === 'deposit'
+        ? t('book.transferDepositText', { amount: formatPrice(booking.price), rest: formatPrice(sessionPrice() - booking.price) })
+        : t('book.transferText', { amount: formatPrice(booking.price) })
     : whatsappHref
       ? t('book.waText')
       : t('book.successText', { name: booking.name });
@@ -644,7 +657,7 @@ loadConfig()
       $('confirm-btn').dataset.i18n = 'book.saveBooking';
       $('confirm-btn').textContent = t('book.saveBooking');
       const wanted = new URLSearchParams(location.search).get('plan');
-      const pick = document.querySelector(`#plan-options input[value="${wanted === 'pack' || wanted === 'card' ? wanted : 'single'}"]`);
+      const pick = document.querySelector(`#plan-options input[value="${['pack', 'card', 'deposit'].includes(wanted) ? wanted : 'single'}"]`);
       if (pick) pick.checked = true;
       $('plan-options').addEventListener('change', renderSummary);
     } else if (viaWhatsApp()) {
