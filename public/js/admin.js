@@ -438,14 +438,11 @@ function waWhen(b) {
   const [y, m, d] = b.date.split('-').map(Number);
   return new Intl.DateTimeFormat(b.lang === 'en' ? 'en-GB' : 'he-IL', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d)));
 }
-/** How many sessions are left on the client's card (for a booking from it, or a new one). */
-function cardLine(b, n) {
-  if (n == null || !['card', 'pack'].includes(b.plan)) return '';
-  return n > 1 ? clientText(b, 'waCardLeft', { n }) : n === 1 ? clientText(b, 'waCardLeftOne') : clientText(b, 'waCardLast');
-}
-function approvedMessage(b, cardLeft) {
-  const vars = { name: firstName(b.name), when: waWhen(b), time: b.time };
-  return [clientText(b, b.plan === 'card' ? 'waApprovedFromCard' : 'waApproved', vars), cardLine(b, cardLeft), clientText(b, 'waSeeYou')].filter(Boolean).join(' ');
+/** After approving: David's own appointment message ("ביום חמישי ה-26.11 בשעה 14:00"). */
+function approvedMessage(b) {
+  const [y, m, d] = b.date.split('-').map(Number);
+  const weekday = new Intl.DateTimeFormat('he-IL', { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d))).replace(/^יום\s+/, '');
+  return clientText(b, 'waInvite', { name: firstName(b.name), weekday, date: `${d}.${m}`, when: waWhen(b), time: b.time });
 }
 function cancelledMessage(b, cardLeft) {
   const vars = { name: firstName(b.name), when: waWhen(b), time: b.time };
@@ -465,7 +462,7 @@ const waButton = (link, label, cls) =>
 function offerMessage(kind, b, cardLeft) {
   const box = $('follow-up');
   if (!box) return;
-  const link = waLink(b.phone, kind === 'approved' ? approvedMessage(b, cardLeft) : cancelledMessage(b, cardLeft));
+  const link = waLink(b.phone, kind === 'approved' ? approvedMessage(b) : cancelledMessage(b, cardLeft));
   if (!link) {
     box.hidden = true;
     return;

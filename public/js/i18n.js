@@ -260,13 +260,10 @@ export const dictionaries = {
       followCancelled: 'התור של {name} בוטל.',
       waTell: 'הודעה ל{name} בוואטסאפ',
       waRemind: 'תזכורת בוואטסאפ',
-      // The messages to the client (in the language they booked in), written as David
-      waApproved: 'היי {name}, קיבלתי את התשלום והתור שלך אושר: {when} בשעה {time}.',
-      waApprovedFromCard: 'היי {name}, התור שלך מהכרטיסייה אושר: {when} בשעה {time}.',
-      waCardLeft: 'אחרי המפגש הזה נשארים לך בכרטיסייה {n} מפגשים.',
-      waCardLeftOne: 'אחרי המפגש הזה נשאר לך בכרטיסייה מפגש אחד.',
-      waCardLast: 'זה המפגש האחרון בכרטיסייה.',
-      waSeeYou: 'נתראה!',
+      // The messages to the client (in the language they booked in), written as David.
+      // After approving: his own appointment message, in his words.
+      waInvite:
+        'היי {name},\nבעזרת השם ניפגש ביום {weekday} ה-{date} בשעה {time}\nבקליניקה ברחוב דרויאנוב 5 תל אביב (בית כלל) קומה 7.\nיש להגיע אל הטיפול בבגדים נוחים ומאווררים ועל בטן ריקה כשעה לפני הטיפול.\nניפגש✨✨✨',
       waCancelled: 'היי {name}, התור שלך ב{when} בשעה {time} בוטל.',
       waCardBack: 'המפגש חזר לכרטיסייה (נשארו בה {n}).',
       waRebook: 'אפשר לקבוע מועד אחר כאן: {link}',
@@ -823,12 +820,8 @@ export const dictionaries = {
       followCancelled: 'The booking for {name} is cancelled.',
       waTell: 'Message {name} on WhatsApp',
       waRemind: 'WhatsApp reminder',
-      waApproved: 'Hi {name}, I got your payment and your booking is confirmed: {when} at {time}.',
-      waApprovedFromCard: 'Hi {name}, your booking from your card is confirmed: {when} at {time}.',
-      waCardLeft: 'After this session you have {n} sessions left on your card.',
-      waCardLeftOne: 'After this session you have 1 session left on your card.',
-      waCardLast: 'This is the last session on your card.',
-      waSeeYou: 'See you!',
+      waInvite:
+        'Hi {name},\nGod willing, see you on {when} at {time}\nat the clinic, 5 Druyanov St., Tel Aviv (Beit Klal), 7th floor.\nPlease come to the treatment in comfortable, airy clothes and on an empty stomach for about an hour before the treatment.\nSee you✨✨✨',
       waCancelled: 'Hi {name}, your booking on {when} at {time} is cancelled.',
       waCardBack: 'The session went back on your card ({n} left).',
       waRebook: 'You can book another time here: {link}',
