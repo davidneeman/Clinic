@@ -57,6 +57,7 @@ import {
   uploadsExist,
 } from './content.js';
 import { PAGE_HEADERS } from './page-headers.js';
+import { sendInvite, whatsappSettings } from './whatsapp.js';
 
 const PHONE_RE = /^\+?[\d\s\-()]{7,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -221,6 +222,19 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     }
   }
 
+  /**
+   * David's appointment message to the client on WhatsApp, sent by itself once a booking is
+   * confirmed (only then: never again for the same booking). 'sent', 'failed', or null while
+   * WhatsApp isn't connected (the admin panel then offers the message to send by hand).
+   */
+  async function inviteByWhatsapp(env, booking) {
+    const settings = whatsappSettings(env);
+    if (!settings) return null;
+    const result = await sendInvite(settings, booking, fetchImpl);
+    if (!result.ok) log.error(`The WhatsApp appointment message wasn't sent (${result.reason}${result.code ? ` ${result.code}` : ''}).`);
+    return result.ok ? 'sent' : 'failed';
+  }
+
   /** After a booking is confirmed: into his calendar (and, later, the emails). */
   async function afterConfirmed(env, store, booking) {
     try {
@@ -256,6 +270,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     if (booking) {
       await store.markPaid(payment.id, transaction);
       await afterConfirmed(env, store, booking);
+      await inviteByWhatsapp(env, booking);
     } else {
       const current = await store.bookingById(payment.booking_id);
       if (current?.status === 'confirmed') {
@@ -461,7 +476,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       }
 
       if (!grow) {
-        ctx?.waitUntil?.(afterConfirmed(env, store, booking));
+        ctx?.waitUntil?.(Promise.all([afterConfirmed(env, store, booking), inviteByWhatsapp(env, booking)]));
         return json({ booking: summary }, 201);
       }
 
@@ -793,8 +808,10 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         const pack = (await siteFor(env)).prices.pack;
         if (clientId && booking.plan === 'pack') cardLeft = await admins.addCardSessions(clientId, pack.sessions - 1);
         if (clientId && booking.plan === 'card') cardLeft = await admins.addCardSessions(clientId, -1);
+        // His appointment message, before answering: the panel says whether it went out.
+        const whatsapp = await inviteByWhatsapp(env, booking);
         ctx?.waitUntil?.(afterConfirmed(env, store, booking)); // the calendar
-        return json({ booking, cardLeft });
+        return json({ booking, cardLeft, whatsapp });
       }
 
       // A confirmed session that came off a card (or a new card's first one) goes back on it.

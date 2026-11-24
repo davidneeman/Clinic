@@ -458,10 +458,23 @@ function reminderMessage(b) {
 const waButton = (link, label, cls) =>
   el('a', { class: `btn ${cls} btn-sm`, href: link, target: '_blank', rel: 'noopener noreferrer' }, el('span', { class: 'wa-icon', html: svg('whatsapp') }), label);
 
-/** After approving or cancelling: the message to the client, one tap away. */
-function offerMessage(kind, b, cardLeft) {
+/**
+ * After approving or cancelling: the message to the client, one tap away. After approving with
+ * WhatsApp connected (whatsapp: 'sent'), the server already sent it: the panel just says so; if it
+ * couldn't ('failed'), the same message is offered here to send by hand.
+ */
+function offerMessage(kind, b, cardLeft, whatsapp = null) {
   const box = $('follow-up');
   if (!box) return;
+  const close = el('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => (box.hidden = true) }, t('admin.close'));
+  const show = (text, ...buttons) => {
+    box.replaceChildren(el('p', {}, text), el('div', { class: 'toolbar' }, ...buttons, close));
+    box.hidden = false;
+    // (the list is drawn again, so the button pressed is gone: on to the next thing to do)
+    (buttons[0] || close).focus({ preventScroll: true });
+    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  if (kind === 'approved' && whatsapp === 'sent') return show(t('admin.followSent', { name: b.name }));
   const link = waLink(b.phone, kind === 'approved' ? approvedMessage(b) : cancelledMessage(b, cardLeft));
   if (!link) {
     box.hidden = true;
@@ -471,23 +484,17 @@ function offerMessage(kind, b, cardLeft) {
   const to = getLang() === 'he' && !/^[\u0590-\u05FF]/.test(firstName(b.name)) ? `-${firstName(b.name)}` : firstName(b.name);
   const send = waButton(link, t('admin.waTell', { name: to }), 'btn-primary');
   send.addEventListener('click', () => setTimeout(() => (box.hidden = true), 500));
-  box.replaceChildren(
-    el('p', {}, t(kind === 'approved' ? 'admin.followApproved' : 'admin.followCancelled', { name: b.name })),
-    el('div', { class: 'toolbar' }, send, el('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => (box.hidden = true) }, t('admin.close'))),
-  );
-  box.hidden = false;
-  // (the list is drawn again, so the button pressed is gone: on to the next thing to do)
-  send.focus({ preventScroll: true });
-  box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const said = kind === 'cancelled' ? 'admin.followCancelled' : whatsapp === 'failed' ? 'admin.followNotSent' : 'admin.followApproved';
+  show(t(said, { name: b.name }), send);
 }
 
 async function approveBooking(b) {
   const ask = b.plan === 'card' ? t('admin.approveCardConfirm', { name: b.name }) : t('admin.approveConfirm', { name: b.name, amount: formatMoney(b.price) });
   if (!confirm(ask)) return;
   try {
-    const { booking, cardLeft } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
+    const { booking, cardLeft, whatsapp } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
     toast(cardLeft == null ? t('admin.approved') : `${t('admin.approved')} · ${t('admin.cardLeft', { n: cardLeft })}`);
-    offerMessage('approved', booking, cardLeft);
+    offerMessage('approved', booking, cardLeft, whatsapp);
   } catch (err) {
     if (err.status === 401) return showLogin();
     toast(t(err.data?.error === 'slot_taken' ? 'admin.approveTaken' : 'common.error'));

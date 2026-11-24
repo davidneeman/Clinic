@@ -258,6 +258,8 @@ export const dictionaries = {
       cancelledCard: 'הפגישה בוטלה · המפגש חזר לכרטיסייה (נשארו {n})',
       followApproved: 'התור של {name} אושר.',
       followCancelled: 'התור של {name} בוטל.',
+      followSent: 'התור של {name} אושר, והזימון נשלח בוואטסאפ.',
+      followNotSent: 'התור של {name} אושר, אבל הזימון לא יצא בוואטסאפ אוטומטית. אפשר לשלוח אותו מכאן:',
       waTell: 'הודעה ל{name} בוואטסאפ',
       waRemind: 'תזכורת בוואטסאפ',
       // The messages to the client (in the language they booked in), written as David.
@@ -479,7 +481,7 @@ export const dictionaries = {
       photoUnreadable: 'אי אפשר לפתוח את הקובץ הזה כתמונה. אפשר לנסות תמונה אחרת.',
       photoSmall: 'התמונה קטנה, ועלולה להיראות מטושטשת במסכים גדולים.',
       // Date and time pickers, drafts, and the tabs' explanations
-      introBookings: 'כל התורים שנקבעו באתר. תור שמחכה לתשלום מסומן ״ממתין לתשלום״: כשרואים את ההעברה בביט או בפייבוקס, לוחצים ״אישור תשלום״ והתור מאושר. ״ביטול פגישה״ משחרר את השעה לאחרים. אחרי אישור או ביטול מופיעה הודעה מוכנה ללקוח בוואטסאפ, ולכל תור מאושר יש כפתור לתזכורת.',
+      introBookings: 'כל התורים שנקבעו באתר. תור שמחכה לתשלום מסומן ״ממתין לתשלום״: כשרואים את ההעברה בביט או בפייבוקס, לוחצים ״אישור תשלום״ והתור מאושר. ״ביטול פגישה״ משחרר את השעה לאחרים. אחרי אישור, הזימון יוצא ללקוח בוואטסאפ: מעצמו, או בלחיצה מכאן. אחרי ביטול מופיעה הודעה מוכנה, ולכל תור מאושר יש כפתור לתזכורת.',
       introClients: 'כל מי שקבע תור נשמר כאן לבד. אפשר לחפש, להוסיף לקוח, לכתוב הערות (רק בניהול רואים אותן) ולעדכן כמה מפגשים נשארו בכרטיסייה.',
       introMessages: 'הודעות שנשלחו מטופס ״יצירת קשר״ באתר.',
       introMessagesWhatsapp: 'כרגע הטופס ״יצירת קשר״ באתר שולח את ההודעות ישר לוואטסאפ, אז הן לא מגיעות לכאן.',
@@ -818,6 +820,8 @@ export const dictionaries = {
       cancelledCard: 'Booking cancelled · the session went back on the card ({n} left)',
       followApproved: 'The booking for {name} is approved.',
       followCancelled: 'The booking for {name} is cancelled.',
+      followSent: 'The booking for {name} is approved, and the appointment message went out on WhatsApp.',
+      followNotSent: 'The booking for {name} is approved, but the appointment message didn’t go out on WhatsApp by itself. You can send it from here:',
       waTell: 'Message {name} on WhatsApp',
       waRemind: 'WhatsApp reminder',
       waInvite:
@@ -1037,7 +1041,7 @@ export const dictionaries = {
       photoUnreadable: 'This file can’t be opened as a photo. Try another one.',
       photoSmall: 'The photo is small and may look soft on big screens.',
       // Date and time pickers, drafts, and the tabs' explanations
-      introBookings: 'All the bookings made on the site. One waiting for payment is marked “awaiting payment”: when you see the Bit or PayBox transfer, press “Approve payment” and the booking is confirmed. “Cancel booking” frees the time for others. After approving or cancelling, a message to the client is ready on WhatsApp, and each confirmed booking has a reminder button.',
+      introBookings: 'All the bookings made on the site. One waiting for payment is marked “awaiting payment”: when you see the Bit or PayBox transfer, press “Approve payment” and the booking is confirmed. “Cancel booking” frees the time for others. After approving, the appointment message goes to the client on WhatsApp: by itself, or with one tap here. After cancelling, a message is ready, and each confirmed booking has a reminder button.',
       introClients: 'Everyone who books is kept here on their own. You can search, add a client, write notes (only the admin panel shows them) and update how many sessions are left on a card.',
       introMessages: 'Messages sent from the site’s contact form.',
       introMessagesWhatsapp: 'Right now the site’s contact form sends messages straight to WhatsApp, so they don’t arrive here.',

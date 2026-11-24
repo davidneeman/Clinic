@@ -12,10 +12,11 @@ The site runs on Cloudflare's free plan:
 | Signing in to the admin panel | Face ID, Touch ID or a fingerprint (passkeys, `worker/passkeys.js`), no password. A person is added with a one-time link | Free |
 | Payment at booking | Grow's own secure page (`worker/grow.js`): card details never reach the site | Grow's fees only |
 | The iPhone calendar | iCloud, over CalDAV (`worker/calendar.js`) | Free |
+| David's appointment message to clients, on WhatsApp | Meta's WhatsApp Cloud API (`worker/whatsapp.js`), from a business number | Meta's price per message (about 2 agorot in Israel), no monthly fee |
 
 `BOOKING_MODE` in `wrangler.jsonc` decides how bookings work:
 
-- `"transfer"` (now): bookings are made on the site, and the client pays by Bit or PayBox to David's phone (058-434-4047): one session (350 ₪), the 4-session card (1,200 ₪, this session included), or a session from a card they already have (nothing to pay). The confirmation shows the number, the amount and the booking number to write in the transfer's note, and, once David sets his own Bit and PayBox links in the admin panel (below), buttons that open the app straight to him: the client types in the amount and pastes the booking number, which the button copies. (Neither app lets a link to a private account fill in the amount; a payment page with the amount set and no approval by hand is what Grow's "pay" mode below does.) The time is held until David approves it under **פגישות** (or the appointment time passes); approving adds the client to **לקוחות**, adds the card's other 3 sessions or takes one, and puts the booking in his calendar. The site can't see Bit or PayBox payments itself, so approving is by hand. Cancelling a confirmed session that came off a card (or a new card's first one) puts it back on the card. After approving, the panel offers David's own appointment message on WhatsApp (the day and time, the clinic's address with the floor, and how to come); after cancelling, a message saying so, with the session back on their card if it came off one and a link to book again. Both are in the language the client booked in (David's message in English is a translation), and each confirmed booking coming up also has a reminder button. Either one opens WhatsApp to the client's number with the message written, and David presses send: nothing is sent by itself. Messages still go to WhatsApp.
+- `"transfer"` (now): bookings are made on the site, and the client pays by Bit or PayBox to David's phone (058-434-4047): one session (350 ₪), the 4-session card (1,200 ₪, this session included), or a session from a card they already have (nothing to pay). The confirmation shows the number, the amount and the booking number to write in the transfer's note, and, once David sets his own Bit and PayBox links in the admin panel (below), buttons that open the app straight to him: the client types in the amount and pastes the booking number, which the button copies. (Neither app lets a link to a private account fill in the amount; a payment page with the amount set and no approval by hand is what Grow's "pay" mode below does.) The time is held until David approves it under **פגישות** (or the appointment time passes); approving adds the client to **לקוחות**, adds the card's other 3 sessions or takes one, and puts the booking in his calendar. The site can't see Bit or PayBox payments itself, so approving is by hand. Cancelling a confirmed session that came off a card (or a new card's first one) puts it back on the card. After approving, David's own appointment message (the day and time, the clinic's address with the floor, and how to come) goes to the client on WhatsApp by itself once WhatsApp is connected (below), and until then the panel offers it to send with one tap; after cancelling, a message saying so, with the session back on their card if it came off one and a link to book again. Both are in the language the client booked in (David's message in English is a translation), and each confirmed booking coming up also has a reminder button. Either one opens WhatsApp to the client's number with the message written, and David presses send: nothing is sent by itself. Messages still go to WhatsApp.
 - `"whatsapp"`: like the first version of the site. A booking request or a message opens WhatsApp, and nothing is stored. The free times come from the opening hours, minus the days closed in the admin panel (and, once connected, minus his calendar).
 - `"pay"`: what David chose. The client books and pays in full on the site, and messages still go to WhatsApp. See "Payment at booking" below.
 - `"online"`: bookings and messages are taken and stored on the site without payment.
@@ -30,10 +31,12 @@ Ready now:
 - The database.
 - Payment at booking through Grow, tested against a stand-in for Grow's API.
 - The iCloud calendar, tested against a real CalDAV server (Radicale).
+- David's appointment message on WhatsApp, sent by itself when a booking is confirmed, tested against a stand-in for Meta's API.
 
 Still missing:
 - **David's Grow account**, and Grow's approval for real payments (below).
 - **An app-specific password** for his iCloud calendar (below).
+- **WhatsApp for the appointment message**: a business number, and his message approved by Meta (below).
 - **The domain** (the one his father has).
 - **The terms and privacy policy**: Grow requires them before approving the site.
 - **Emails** to him and to clients: they need the domain.
@@ -144,6 +147,47 @@ npx wrangler secret put ICLOUD_USER           # his Apple ID email
 npx wrangler secret put ICLOUD_APP_PASSWORD   # the password Apple shows, once
 ```
 
+## The appointment message on WhatsApp
+
+When a booking is confirmed (David approves the payment under **פגישות**, or Grow confirms it), the client gets David's appointment message on WhatsApp by itself, in the language they booked in. The admin panel says it went out. If it couldn't go (the message isn't approved by Meta yet, or Meta didn't answer), the panel offers the same message to send by hand, as before. It goes once per booking, and nothing else is sent by itself: the cancel message and the reminders stay one tap away in the panel.
+
+It goes through Meta's WhatsApp Cloud API (`worker/whatsapp.js`): Meta charges per message (a "utility" message, about 2 agorot in Israel), with no monthly fee. The words are kept at Meta, as a message template; the site sends only the first name, the day, the date and the time.
+
+**The number.** A number connected to the API can't be on the WhatsApp app at the same time. So either:
+- **A second number** just for these messages (a SIM or eSIM that can get one SMS or call, and isn't on WhatsApp). His 058-434-4047 stays as it is. Replies to the second number don't reach his phone, so the message gets a button that opens a chat with his own number (step 4).
+- **His own number**, after deleting its WhatsApp account: he then can't use the WhatsApp app on it.
+
+Steps, with David, on a computer:
+1. developers.facebook.com → **My Apps → Create app** → use case **Connect with customers through WhatsApp** → his business portfolio (or a new one, in his name).
+2. **WhatsApp → API Setup → Add phone number**: the name clients see (Meta reviews it), the category, then the code by SMS or call.
+3. **WhatsApp Manager → Payment settings**: a card, for the messages.
+4. **WhatsApp Manager → Message templates → Create template**: category **Utility**, name `appointment_confirmed`, language **Hebrew**, and this text exactly:
+   ```
+   היי {{1}},
+   בעזרת השם ניפגש ביום {{2}} ה-{{3}} בשעה {{4}}
+   בקליניקה ברחוב דרויאנוב 5 תל אביב (בית כלל) קומה 7.
+   יש להגיע אל הטיפול בבגדים נוחים ומאווררים ועל בטן ריקה כשעה לפני הטיפול.
+   ניפגש✨✨✨
+   ```
+   Samples: נועה, רביעי, 25.11, 09:00. With a second number, add a **Visit website** button: "הודעה לדוד", `https://wa.me/972584344047`. Then **Add language → English**, with the same name:
+   ```
+   Hi {{1}},
+   God willing, see you on {{2}} {{3}} at {{4}}
+   at the clinic, 5 Druyanov St., Tel Aviv (Beit Klal), 7th floor.
+   Please come to the treatment in comfortable, airy clothes and on an empty stomach for about an hour before the treatment.
+   See you✨✨✨
+   ```
+   Samples: Dana, Wednesday, 25 November, 09:00 (and the button: "Message David"). Meta reviews each language, usually within minutes to hours.
+5. **Business settings → Users → System users → Add** (an admin) → **Assign assets**: the app, and the WhatsApp account with full control → **Generate token**: the app, never expires, with `whatsapp_business_messaging` and `whatsapp_business_management`. Meta shows it once.
+6. The two secrets, entered together with him (never over WhatsApp):
+   ```sh
+   npx wrangler secret put WHATSAPP_TOKEN      # the token from step 5
+   npx wrangler secret put WHATSAPP_PHONE_ID   # API Setup → "Phone number ID" (digits)
+   ```
+7. Try it: book a session with your own number, and approve it in the panel.
+
+Until Meta verifies his business, the number can message up to 250 people a day. (For tests on this machine, `WHATSAPP_API_BASE` points the Worker at a stand-in for Meta's API.)
+
 ## Settings
 
 | Name | Kind | What |
@@ -156,6 +200,7 @@ npx wrangler secret put ICLOUD_APP_PASSWORD   # the password Apple shows, once
 | `ADMIN_EMAILS` | secret, optional | Who may sign in through Access, with a comma between addresses |
 | `GROW_USER_ID`, `GROW_PAGE_CODE` | secrets | Grow's identifiers for the account (and `GROW_API_KEY` if Grow gives one) |
 | `ICLOUD_USER`, `ICLOUD_APP_PASSWORD` | secrets | His Apple ID email and the app-specific password |
+| `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID` | secrets | The WhatsApp system user's token and the sending number's ID |
 
 Secrets are set only with `npx wrangler secret put` (or in the dashboard). Never put them in this repository, in WhatsApp or in an email. Deploys never change them.
 

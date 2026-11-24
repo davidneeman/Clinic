@@ -17,3 +17,8 @@ GROW_PAGE_CODE=
 # The iCloud calendar: the Apple ID email and an app-specific password.
 ICLOUD_USER=
 ICLOUD_APP_PASSWORD=
+
+# The appointment message on WhatsApp (Meta's Cloud API): the system user's token and the
+# sending number's ID. Empty: nothing is sent, and the admin panel offers the message by hand.
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_ID=
