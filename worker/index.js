@@ -58,6 +58,7 @@ import {
 } from './content.js';
 import { PAGE_HEADERS } from './page-headers.js';
 import { sendInvite, whatsappSettings } from './whatsapp.js';
+import { OUTBOX_KINDS, openOutbox } from './outbox.js';
 
 const PHONE_RE = /^\+?[\d\s\-()]{7,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -222,6 +223,9 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     }
   }
 
+  /** What David still has to send his clients, and what he already sent (worker/outbox.js). */
+  const outboxFor = (env) => openOutbox(env.DB, { clock, tz });
+
   /**
    * David's appointment message to the client on WhatsApp, sent by itself once a booking is
    * confirmed (only then: never again for the same booking). 'sent', 'failed', or null while
@@ -270,7 +274,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     if (booking) {
       await store.markPaid(payment.id, transaction);
       await afterConfirmed(env, store, booking);
-      await inviteByWhatsapp(env, booking);
+      const whatsapp = await inviteByWhatsapp(env, booking);
+      await outboxFor(env).confirmed(booking, { sent: whatsapp === 'sent' });
     } else {
       const current = await store.bookingById(payment.booking_id);
       if (current?.status === 'confirmed') {
@@ -482,7 +487,8 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
       }
 
       if (!grow) {
-        ctx?.waitUntil?.(Promise.all([afterConfirmed(env, store, booking), inviteByWhatsapp(env, booking)]));
+        const invite = inviteByWhatsapp(env, booking).then((whatsapp) => outboxFor(env).confirmed(booking, { sent: whatsapp === 'sent' }));
+        ctx?.waitUntil?.(Promise.all([afterConfirmed(env, store, booking), invite]));
         return json({ booking: summary }, 201);
       }
 
@@ -795,6 +801,18 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         }
       }
 
+      // The messages he still has to send, written in the panel; and "sent" (or not after all).
+      if (route === 'GET /api/admin/outbox') return json({ items: await outboxFor(env).due(store) });
+      const sentMark = /^\/api\/admin\/outbox\/(\d{1,12})\/([a-z]+)$/.exec(path);
+      if (method === 'POST' && sentMark) {
+        if (!OUTBOX_KINDS.includes(sentMark[2])) throw notFound();
+        const booking = await store.bookingById(Number(sentMark[1]));
+        if (!booking) throw notFound();
+        if (typeof body?.done !== 'boolean') throw invalid(['done']);
+        await outboxFor(env).mark(booking, sentMark[2], body.done);
+        return json({ ok: true });
+      }
+
       if (route === 'GET /api/admin/bookings') {
         const bookings = await store.listBookings(url.searchParams.get('scope'), today);
         // A session from a card: how many the client has left, to check before approving.
@@ -824,6 +842,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         if (clientId && booking.plan === 'card') cardLeft = await admins.addCardSessions(clientId, -1);
         // His appointment message, before answering: the panel says whether it went out.
         const whatsapp = await inviteByWhatsapp(env, booking);
+        await outboxFor(env).confirmed(booking, { sent: whatsapp === 'sent' }); // (his to send, if it didn't go)
         ctx?.waitUntil?.(afterConfirmed(env, store, booking)); // the calendar
         return json({ booking, cardLeft, whatsapp });
       }
@@ -839,6 +858,7 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
         if (before?.status === 'confirmed' && booking.client_id && (booking.plan === 'card' || booking.plan === 'pack')) {
           cardLeft = await admins.addCardSessions(booking.client_id, 1);
         }
+        await outboxFor(env).cancelled(booking, cardLeft); // the message to the client, his to send
         return json({ booking, cardLeft });
       }
 
@@ -934,8 +954,10 @@ export function createWorker({ config = siteConfig, clock = () => new Date(), fe
     }
     await store.expireHolds();
     await openAdminStore(env.DB, clock).purge();
-    // Once a day: photos he uploaded that nothing on the site uses any more.
+    // Once a day: what was sent for appointments more than a week past, and photos he uploaded
+    // that nothing on the site uses any more.
     const at = clock();
+    if (at.getUTCHours() === 2 && at.getUTCMinutes() < 10) await outboxFor(env).prune(now().date);
     if (env.MEDIA && at.getUTCHours() === 2 && at.getUTCMinutes() < 10) {
       try {
         await removeUnusedUploads(env.MEDIA, await contentFor(env).content(), at);

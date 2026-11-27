@@ -1,4 +1,4 @@
-import { api, clearFieldErrors, el, getLang, loadConfig, locale, onLangChange, pick, showFieldErrors, t, toast } from './site.js';
+import { api, clearFieldErrors, el, loadConfig, locale, onLangChange, pick, showFieldErrors, t, toast } from './site.js';
 import { svg } from './icons.js';
 import { dictionaries } from './i18n.js';
 import { createSiteTab } from './admin-site.js';
@@ -383,7 +383,8 @@ for (const b of document.querySelectorAll('[data-scope]')) {
 }
 
 async function loadBookings() {
-  const { bookings } = await guarded(() => api(`/api/admin/bookings?scope=${state.scope}`));
+  // (the messages to send, with the bookings coming up: they're shown above them)
+  const [{ bookings }] = await Promise.all([guarded(() => api(`/api/admin/bookings?scope=${state.scope}`)), state.scope === 'upcoming' ? loadOutbox() : null]);
   state.bookings = bookings;
   state.bookingsAt = Date.now();
   if (state.scope === 'upcoming') {
@@ -463,48 +464,132 @@ function reminderMessage(b) {
 const waButton = (link, label, cls) =>
   el('a', { class: `btn ${cls} btn-sm`, href: link, target: '_blank', rel: 'noopener noreferrer' }, el('span', { class: 'wa-icon', html: svg('whatsapp') }), label);
 
-/**
- * After approving or cancelling: the message to the client, one tap away. After approving with
- * WhatsApp connected (whatsapp: 'sent'), the server already sent it: the panel just says so; if it
- * couldn't ('failed'), the same message is offered here to send by hand.
- */
-function offerMessage(kind, b, cardLeft, whatsapp = null) {
-  const box = $('follow-up');
-  if (!box) return;
-  const close = el('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => (box.hidden = true) }, t('admin.close'));
-  const show = (text, ...buttons) => {
-    box.replaceChildren(el('p', {}, text), el('div', { class: 'toolbar' }, ...buttons, close));
-    box.hidden = false;
-    // (the list is drawn again, so the button pressed is gone: on to the next thing to do)
-    (buttons[0] || close).focus({ preventScroll: true });
-    box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  };
-  if (kind === 'approved' && whatsapp === 'sent') return show(t('admin.followSent', { name: b.name }));
-  const link = waLink(b.phone, kind === 'approved' ? approvedMessage(b) : cancelledMessage(b, cardLeft));
-  if (!link) {
-    box.hidden = true;
-    return;
+// ---------------------------------------------------------------------------
+// Messages to send: what David still has to send each client, and when, written and ready
+// (worker/outbox.js decides what's due). One tap opens WhatsApp with it; or he copies it.
+// ---------------------------------------------------------------------------
+
+const OUTBOX_LABEL = { invite: 'admin.outboxInvite', reminder: 'admin.outboxReminder', cancel: 'admin.outboxCancel' };
+
+function outboxText(item) {
+  const b = item.booking;
+  return item.kind === 'invite' ? approvedMessage(b) : item.kind === 'reminder' ? reminderMessage(b) : cancelledMessage(b, item.cardLeft);
+}
+
+/** Why it's due now: approved, cancelled, or the booking is today or tomorrow. */
+function outboxWhy(item) {
+  if (item.kind !== 'reminder') return t(item.kind === 'invite' ? 'admin.outboxWhyInvite' : 'admin.outboxWhyCancel');
+  return t(item.booking.date === todayIn(state.config?.timezone || 'Asia/Jerusalem') ? 'admin.outboxWhyToday' : 'admin.outboxWhyTomorrow');
+}
+
+async function loadOutbox() {
+  try {
+    state.outbox = (await api('/api/admin/outbox')).items;
+  } catch (err) {
+    if (err.status === 401) return showLogin();
+    return; // (the list stays as it was; the bookings say what went wrong)
   }
-  // (in Hebrew, "ל" before a name in other letters takes a hyphen: ל-Dana)
-  const to = getLang() === 'he' && !/^[\u0590-\u05FF]/.test(firstName(b.name)) ? `-${firstName(b.name)}` : firstName(b.name);
-  const send = waButton(link, t('admin.waTell', { name: to }), 'btn-primary');
-  send.addEventListener('click', () => setTimeout(() => (box.hidden = true), 500));
-  const said = kind === 'cancelled' ? 'admin.followCancelled' : whatsapp === 'failed' ? 'admin.followNotSent' : 'admin.followApproved';
-  show(t(said, { name: b.name }), send);
+  renderOutbox();
+}
+
+function renderOutbox() {
+  const box = $('outbox');
+  if (!box) return;
+  const items = state.outbox || [];
+  box.hidden = !items.length;
+  box.replaceChildren(
+    ...(items.length
+      ? [
+          el('h2', { class: 'outbox-title' }, el('span', {}, t('admin.outboxTitle')), el('span', { class: 'badge' }, String(items.length))),
+          el('p', { class: 'outbox-intro' }, t('admin.outboxIntro')),
+          ...items.map(outboxItem),
+        ]
+      : []),
+  );
+}
+
+function outboxItem(item) {
+  const b = item.booking;
+  const text = outboxText(item);
+  const link = waLink(b.phone, text);
+  const actions = el('div', { class: 'toolbar outbox-actions' });
+  const card = el(
+    'article',
+    { class: 'outbox-item', 'data-id': String(b.id), 'data-kind': item.kind },
+    el('h3', { class: 'outbox-head' }, el('span', { class: 'chip-waiting' }, t(OUTBOX_LABEL[item.kind])), ' ', el('span', {}, b.name)),
+    el('p', { class: 'outbox-when' }, `${fmtDate(b.date)} · `, el('bdi', {}, b.time), ` · ${outboxWhy(item)}`),
+    el('p', { class: 'outbox-text', dir: b.lang === 'en' ? 'ltr' : 'rtl', lang: b.lang === 'en' ? 'en' : 'he' }, text),
+    actions,
+  );
+  // Sent (or copied): marked on the server, so it isn't asked again; "back to the list" if not.
+  const setDone = async (done) => {
+    try {
+      await api(`/api/admin/outbox/${b.id}/${item.kind}`, { method: 'POST', body: { done } });
+    } catch (err) {
+      if (err.status === 401) return showLogin();
+      toast(t('common.error'));
+      return;
+    }
+    item.done = done;
+    draw();
+    actions.querySelector('button, a')?.focus({ preventScroll: true });
+  };
+  const draw = () => {
+    card.classList.toggle('is-done', Boolean(item.done));
+    if (item.done) {
+      actions.replaceChildren(
+        el('span', { class: 'outbox-done' }, t('admin.outboxDone')),
+        el('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => setDone(false) }, t('admin.outboxUndo')),
+      );
+      return;
+    }
+    const send = link ? waButton(link, t('admin.outboxSend'), 'btn-primary outbox-send') : '';
+    if (send) send.addEventListener('click', () => setDone(true));
+    const copy = el(
+      'button',
+      {
+        type: 'button',
+        class: 'btn btn-outline btn-sm outbox-copy',
+        onclick: async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch {
+            toast(t('admin.outboxCopyFailed'));
+            return;
+          }
+          toast(t('admin.outboxCopied'));
+          setDone(true);
+        },
+      },
+      t('admin.outboxCopy'),
+    );
+    actions.replaceChildren(send, copy);
+  };
+  draw();
+  return card;
+}
+
+/** After approving or cancelling: on to the message that's now due for it. */
+function toOutbox(id, kind) {
+  const card = document.querySelector(`#outbox .outbox-item[data-id="${id}"][data-kind="${kind}"]`);
+  if (!card) return;
+  card.querySelector('.outbox-actions a, .outbox-actions button')?.focus({ preventScroll: true });
+  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 async function approveBooking(b) {
   const ask = b.plan === 'card' ? t('admin.approveCardConfirm', { name: b.name }) : t('admin.approveConfirm', { name: b.name, amount: formatMoney(b.price) });
   if (!confirm(ask)) return;
   try {
-    const { booking, cardLeft, whatsapp } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
-    toast(cardLeft == null ? t('admin.approved') : `${t('admin.approved')} · ${t('admin.cardLeft', { n: cardLeft })}`);
-    offerMessage('approved', booking, cardLeft, whatsapp);
+    const { cardLeft, whatsapp } = await api(`/api/admin/bookings/${b.id}/approve`, { method: 'POST', body: {} });
+    const said = [t(whatsapp === 'sent' ? 'admin.approvedSent' : 'admin.approved'), cardLeft == null ? '' : t('admin.cardLeft', { n: cardLeft })];
+    toast(said.filter(Boolean).join(' · '));
   } catch (err) {
     if (err.status === 401) return showLogin();
     toast(t(err.data?.error === 'slot_taken' ? 'admin.approveTaken' : 'common.error'));
   }
-  loadBookings();
+  await loadBookings().catch(() => {});
+  toOutbox(b.id, 'invite');
   if (state.passkeys) loadClients();
 }
 
@@ -556,8 +641,8 @@ function renderBookings() {
           b.status === 'pending' && state.scope === 'upcoming'
             ? el('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => approveBooking(b) }, t(b.plan === 'card' ? 'admin.approveCard' : 'admin.approve'))
             : '',
-          // A reminder to the client, written and ready.
-          b.status === 'confirmed' && state.scope === 'upcoming' && waNumber(b.phone) ? waButton(waLink(b.phone, reminderMessage(b)), t('admin.waRemind'), 'btn-outline') : '',
+          // A reminder to the client, written and ready (sent from here: off the messages to send).
+          b.status === 'confirmed' && state.scope === 'upcoming' && waNumber(b.phone) ? reminderButton(b) : '',
           ['confirmed', 'pending'].includes(b.status) && state.scope === 'upcoming'
             ? el('button', { type: 'button', class: 'btn btn-danger btn-sm', onclick: () => cancelBooking(b) }, t('admin.cancel'))
             : '',
@@ -569,11 +654,21 @@ function renderBookings() {
 
 async function cancelBooking(b) {
   if (!confirm(t('admin.cancelConfirm', { name: b.name }))) return;
-  const { booking, cardLeft } = await guarded(() => api(`/api/admin/bookings/${b.id}/cancel`, { method: 'POST', body: {} }));
+  const { cardLeft } = await guarded(() => api(`/api/admin/bookings/${b.id}/cancel`, { method: 'POST', body: {} }));
   toast(cardLeft == null ? t('admin.cancelledToast') : t('admin.cancelledCard', { n: cardLeft }));
-  offerMessage('cancelled', booking, cardLeft);
-  loadBookings();
+  await loadBookings().catch(() => {});
+  toOutbox(b.id, 'cancel');
   if (cardLeft != null && state.passkeys) loadClients();
+}
+
+function reminderButton(b) {
+  const a = waButton(waLink(b.phone, reminderMessage(b)), t('admin.waRemind'), 'btn-outline');
+  a.addEventListener('click', () => {
+    api(`/api/admin/outbox/${b.id}/reminder`, { method: 'POST', body: { done: true } })
+      .then(loadOutbox)
+      .catch(() => {});
+  });
+  return a;
 }
 
 // ---------------------------------------------------------------------------
@@ -1191,7 +1286,7 @@ onSave($('invite-form'), async () => {
 // ---------------------------------------------------------------------------
 
 onLangChange(() => {
-  if ($('follow-up')) $('follow-up').hidden = true; // (written in the language it was shown in)
+  renderOutbox();
   if ($('dashboard').hidden) return;
   renderBookings();
   if (state.schedule) {

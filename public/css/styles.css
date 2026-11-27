@@ -5782,21 +5782,84 @@ html.js .reveal:not(.is-visible) {
   color: var(--ink);
 }
 
-/* Signed in with the phone on a computer: the offer to save the sign-in here; and after approving
-   or cancelling, the message to the client on WhatsApp */
-.device-offer,
-.follow-up {
+/* Signed in with the phone on a computer: the offer to save the sign-in here */
+.device-offer {
   margin-bottom: 16px;
 }
 
-.device-offer p,
-.follow-up p {
+.device-offer p {
   margin: 0 0 12px;
 }
 
-.device-offer .toolbar,
-.follow-up .toolbar {
+.device-offer .toolbar {
   margin-bottom: 0;
+}
+
+/* The messages David still has to send clients (top of the bookings tab), written and ready */
+.outbox {
+  margin-bottom: 24px;
+}
+
+.outbox-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+}
+
+.outbox-intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.outbox-item {
+  margin-top: 12px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+.outbox-item.is-done {
+  border-inline-start-color: var(--border);
+}
+
+.outbox-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.outbox-when {
+  margin: 4px 0 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.outbox-text {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border-radius: calc(var(--radius) / 2);
+  line-height: 1.6;
+}
+
+.outbox-actions {
+  margin: 0;
+}
+
+.outbox-done {
+  align-self: center;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .wa-icon {
